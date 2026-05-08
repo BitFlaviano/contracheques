@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Painel do Colaborador</title>
+    <link rel="stylesheet" href="styleadmin.css">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+
+<body>
+
+    <!-- HEADER -->
+    <div class="header">
+        <h1>Painel do Colaborador</h1>
+        <button onclick="fazerLogout()">Sair</button>
+    </div>
+
+    <div class="container">
+        
+        <div class="card">
+
+            <div class="header-card">
+                <h3>Bem-vindo, <span id="nome-usuario"></span>!</h3>
+
+                
+            </div>
+            
+            
+            
+            
+            
+            <p>Seus contracheques:</p>
+            <!-- LOADING -->
+            <div id="loading-user" style="display:none;">
+                <div class="dots"></div>
+            </div>
+            <div id="lista-arquivos"></div>
+            <!-- <button id="btn-refresh" class="btn-refresh" onclick="recarregarContracheques()" style="display:none;">
+            ⟳
+            </button> -->
+        </div>
+    </div>
+    <script>
+        window.addEventListener("DOMContentLoaded", () => {
+
+            const btn = document.getElementById("btn-login");
+
+            if (btn) {
+                btn.addEventListener("click", fazerLogin);
+            }
+        });
+    </script>
+    <script src="script.js"></script>
+</body>
+</html>

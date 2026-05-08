@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Upload de Contracheques</title>
+    <link rel="stylesheet" href="styleupload.css">                                                          
+</head>
+
+<body>
+
+    <div class="box">
+        <h2>Enviar PDF</h2>
+
+        <input type="file" id="pdf" accept="application/pdf">
+        <button onclick="enviarPDF()">Enviar</button>
+
+        <div id="loading" style="display:none;">
+          <div class="dots"></div>
+            
+          </div>
+
+        <p id="msg"></p>
+    </div>
+    <script src="script.js"></script>
+    
+</body>
+</html>

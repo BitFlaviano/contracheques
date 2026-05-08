@@ -1,0 +1,368 @@
+body {  
+  font-family: sans-serif; 
+  display: flex; 
+  justify-content: center; 
+  padding: 50px; 
+  background: #f4f4f9; 
+}
+
+.card { 
+  background: white; 
+  padding: 30px; 
+  border-radius: 8px; 
+  box-shadow: 0 4px 6px rgba(0,0,0,0.1); 
+  width: 100%; max-width: 400px; 
+}
+
+input { 
+  width: 100%; 
+  padding: 10px; 
+  margin: 10px 0; 
+  border: 1px solid #ddd; 
+  border-radius: 4px; 
+  box-sizing: border-box; 
+}
+
+button {
+  width: 100%; 
+  padding: 10px; 
+  background: #007bff; 
+  color: white; 
+  border: none;
+  border-radius: 4px; 
+  cursor: pointer; 
+}
+
+button:hover { 
+  background: #0056b3; 
+}
+
+.hidden { 
+  display: none; 
+}
+
+.documento { 
+  border-bottom: 1px solid #eee; 
+  padding: 10px 0; 
+  display: flex; 
+  justify-content: space-between; 
+  align-items: center; 
+}
+
+.btn-download { 
+  background: #28a745; 
+  width: auto; 
+  font-size: 0.8em; 
+  border-radius: 4px;
+}
+
+body {
+  font-family: Arial;
+  background: #f4f4f4;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
+}
+
+.box  {
+  background: white;
+  padding: 30px;
+  border-radius: 10px;
+  width: 300px;
+  box-shadow: 0 0 10px rgba(0,0,0,0.1);
+}
+
+.id {
+  background: white;
+  padding: 30px;
+  border-radius: 10px;
+  width: 100%;
+  box-shadow: 0 0 10px rgba(0,0,0,0.1);
+}
+
+input {
+  width: 100%;
+  margin-top: 10px;
+  padding: 10px;
+}
+
+
+select, button {
+  width: 100%;
+  margin-top: 10px;
+  padding: 10px;
+}
+
+button {
+  background: #28a745;
+  color: white;
+  border: none;
+  cursor: pointer;
+  width: 100%;
+  border-radius: 4px;
+}
+
+button:hover {
+  background: #218838;
+}
+#loading {
+    margin-top: 10px;
+    text-align: center;
+    font-weight: bold;
+    color: #007bff;
+}
+
+#msg {
+    margin-top: 10px;
+    text-align: center;
+}
+#loading {
+    display: none;
+    margin-top: 10px;
+    text-align: center;
+    font-weight: bold;
+    color: #007bff;
+}
+#loading {
+    margin-top: 15px;
+    text-align: center;
+}
+
+.dots {
+    width: 56px;
+    height: 26.9px;
+    margin: 0 auto 10px auto;
+    background: radial-gradient(circle closest-side,#474bff 90%,#0000) 0%   50%,
+               radial-gradient(circle closest-side,#474bff 90%,#0000) 50%  50%,
+               radial-gradient(circle closest-side,#474bff 90%,#0000) 100% 50%;
+    background-size: calc(100%/3) 13.4px;
+    background-repeat: no-repeat;
+    animation: dots-7ar3yq 1s infinite linear;
+}
+
+@keyframes dots-7ar3yq {
+    20% { background-position: 0% 0%, 50% 50%, 100% 50%; }
+    40% { background-position: 0% 100%, 50% 0%, 100% 50%; }
+    60% { background-position: 0% 50%, 50% 100%, 100% 0%; }
+    80% { background-position: 0% 50%, 50% 50%, 100% 100%; }
+}
+
+.btn-refresh {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    border: none;
+    background: #4da3d9;
+    color: white;
+    font-size: 18px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+    margin-left: auto;
+}
+
+.btn-refresh:hover {
+    background: #3b8ec2;
+    transform: rotate(90deg);
+}
+
+.btn-refresh:active {
+    transform: scale(0.95) rotate(90deg);
+}
+
+.btn-refresh {
+    background: #007bff;
+    color: #fff;
+    border: none;
+    padding: 8px 12px;   /* igual aos outros botões */
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 14px;
+    height: 36px;        /* 👈 força alinhamento */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-left: auto;
+    display: block;
+}
+
+.btn-refresh:hover {
+    background: #0056b3;
+}
+.header-card {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+.dots {
+    width: 56px;
+    height: 26.9px;
+    margin: 0 auto 10px auto;
+    background: radial-gradient(circle closest-side,#474bff 90%,#0000) 0%   50%,
+               radial-gradient(circle closest-side,#474bff 90%,#0000) 50%  50%,
+               radial-gradient(circle closest-side,#474bff 90%,#0000) 100% 50%;
+    background-size: calc(100%/3) 13.4px;
+    background-repeat: no-repeat;
+    animation: dots-7ar3yq 1s infinite linear;
+}
+
+@keyframes dots-7ar3yq {
+    20% { background-position: 0% 0%, 50% 50%, 100% 50%; }
+    40% { background-position: 0% 100%, 50% 0%, 100% 50%; }
+    60% { background-position: 0% 50%, 50% 100%, 100% 0%; }
+    80% { background-position: 0% 50%, 50% 50%, 100% 100%; }
+}
+/* =========================
+   RESPONSIVIDADE MOBILE
+========================= */
+
+/* =========================
+   RESPONSIVO MOBILE ADMIN
+========================= */
+@media (max-width: 768px) {
+
+    .user {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+
+        gap: 12px;
+        text-align: center;
+
+        padding: 15px;
+    }
+
+    .user-info {
+        width: 100%;
+        text-align: center;
+    }
+
+    .user-info strong,
+    .user-info span {
+        display: block;
+        text-align: center;
+    }
+
+    .actions {
+        width: 100%;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+
+        gap: 10px;
+        flex-wrap: wrap;
+    }
+
+    .actions button {
+        min-width: 130px;
+    }
+}
+
+@media (max-width: 768px) {
+
+    .user-info,
+    .user-info strong,
+    .user-info span {
+        width: 100%;
+        text-align: center !important;
+        justify-content: center;
+        align-items: center;
+    }
+
+}
+/* =========================
+   RESPONSIVO CONTRACHEQUES
+========================= */
+@media (max-width: 768px) {
+
+    .documento {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+
+        text-align: center;
+        gap: 10px;
+
+        padding: 15px;
+    }
+
+    .documento span {
+        width: 100%;
+        text-align: center;
+        word-break: break-word;
+    }
+
+    .btn-download {
+        width: 100%;
+        max-width: 220px;
+    }
+}
+/* =========================
+   HEADER USUÁRIO MOBILE
+========================= */
+@media (max-width: 768px) {
+
+    .header-card,
+    .header-card h3,
+    #nome-usuario {
+        width: 100%;
+        text-align: center;
+        justify-content: center;
+        align-items: center;
+    }
+
+}
+
+/* =========================
+   MOBILE - CONTEÚDO NO TOPO
+========================= */
+@media (max-width: 768px) {
+
+    body {
+        align-items: flex-start !important;
+        justify-content: flex-start !important;
+
+        padding-top: 20px;
+        min-height: 100vh;
+        overflow-x: hidden;
+    }
+
+    .container,
+    .card {
+        margin-top: 0;
+    }
+}
+/* =========================
+   MOBILE - CARD RESPONSIVO
+========================= */
+@media (max-width: 768px) {
+
+    body {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .card {
+        width: 95% !important;
+        max-width: 95% !important;
+        height: 95%;
+        margin-left: auto;
+        margin-right: auto;
+      
+
+        padding: 18px;
+        box-sizing: border-box;
+    }
+
+    .container {
+        width: 100%;
+        padding: 10px;
+        box-sizing: border-box;
+    }
+
+}
