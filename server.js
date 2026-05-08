@@ -254,6 +254,13 @@ app.use(express.static('public'));
 // =============================
 const PORT = process.env.PORT || 3000;
 
+// =============================
+// ROTA INICIAL
+// =============================
+app.get('/', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'login.html'));
+});
+
 app.listen(PORT, () => {
     console.log(`Servidor rodando na porta ${PORT}`);
 });
