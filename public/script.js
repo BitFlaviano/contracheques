@@ -6,7 +6,7 @@ const SUPABASE_URL = 'https://uatryxvylqwslnaxggjk.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_hIM2Rl5P2BtJHRmLg7qzHQ_dM6tJoxj';
 const client = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-const API_URL = "http://localhost:3000";
+const API_URL = "";
 let userIdSelecionado = null;
 let saindo = false;
 // =============================
@@ -558,7 +558,7 @@ async function enviarPDF() {
     await new Promise(resolve => setTimeout(resolve, 100));
 
     try {
-        const res = await fetch("http://localhost:3000/upload", {
+        const res = await fetch("/upload", {
             method: "POST",
             body: formData
         });
@@ -595,26 +595,6 @@ async function enviarPDF() {
             msg.innerText = "";
         }, 3000);
 }
-
-//----------------------------------
-// RECARREGAR DASBOARD
-//----------------------------------
-
-// async function recarregarContracheques() {
-//     const { data } = await client.auth.getUser();
-
-//     if (!data.user) return;
-
-//     carregarDashboard(data.user);
-
-//     const loading = document.getElementById('loading-user');
-
-//     if (loading) loading.style.display = "block";
-
-//     // ... busca arquivos ...
-
-//     if (loading) loading.style.display = "none";
-// }
 
 async function carregarDashboard(user) {
 

@@ -23,7 +23,7 @@ async function enviarPDF() {
     await new Promise(resolve => setTimeout(resolve, 100));
 
     try {
-        const res = await fetch("http://localhost:3000/upload", {
+        const res = await fetch("/upload", {
             method: "POST",
             body: formData
         });
