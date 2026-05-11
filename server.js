@@ -3,9 +3,9 @@ const cors = require('cors');
 const multer = require('multer');
 const { createClient } = require('@supabase/supabase-js');
 const { PDFDocument } = require('pdf-lib');
-// const pdfParse = require('pdf-parse');
+const pdfParse = require('pdf-parse');
 //const pdf = require('pdf-parse');
-const pdfParse = require('pdf-parse/lib/pdf-parse');
+//const pdfParse = require('pdf-parse/lib/pdf-parse');
 
 const path = require('path');
 
@@ -131,8 +131,8 @@ app.post('/upload', upload.single('pdf'), async (req, res) => {
 
             // extrai texto da página
             //const dadosPagina = await pdfParse(Buffer.from(pdfBytes));
-            const dadosPagina = await pdfParse(Buffer.from(pdfBytes));
-            //const dadosPagina = await pdf(Buffer.from(pdfBytes));
+            //const dadosPagina = await pdfParse(Buffer.from(pdfBytes));
+            const dadosPagina = await pdf(Buffer.from(pdfBytes));
             const textoPagina = dadosPagina.text;
 
             const nome = identificarUsuario(textoPagina, usuarios);
