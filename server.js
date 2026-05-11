@@ -130,9 +130,9 @@ app.post('/upload', upload.single('pdf'), async (req, res) => {
             const pdfBytes = await novoPdf.save();
 
             // extrai texto da página
+            const dadosPagina = await pdfParse(Buffer.from(pdfBytes));
             //const dadosPagina = await pdfParse(Buffer.from(pdfBytes));
-            //const dadosPagina = await pdfParse(Buffer.from(pdfBytes));
-            const dadosPagina = await pdf(Buffer.from(pdfBytes));
+            //const dadosPagina = await pdf(Buffer.from(pdfBytes));
             const textoPagina = dadosPagina.text;
 
             const nome = identificarUsuario(textoPagina, usuarios);
