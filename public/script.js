@@ -814,14 +814,25 @@ document.addEventListener(
         const pagina =
             window.location.pathname;
 
-        if (pagina.includes("login.html")) {
+        // páginas públicas
+        const paginasPublicas = [
+            "/",
+            "/login.html"
+        ];
+
+        // LOGIN
+        if (paginasPublicas.includes(pagina)) {
             return;
         }
 
+        // valida sessão
         const { data } =
             await client.auth.getUser();
 
-        if (!data.user) {
+        const user = data.user;
+
+        // sem login
+        if (!user) {
 
             window.location.href =
                 "login.html";
@@ -829,16 +840,18 @@ document.addEventListener(
             return;
         }
 
-        const user = data.user;
-        const tipo = user.user_metadata?.tipo;
+        const tipo =
+            user.user_metadata?.tipo;
 
-        // USER
+        // =============================
+        // USER.HTML
+        // =============================
         if (pagina.includes("user.html")) {
 
             if (tipo !== "user") {
 
                 window.location.href =
-                    "admin.html";
+                    "login.html";
 
                 return;
             }
@@ -848,13 +861,15 @@ document.addEventListener(
             return;
         }
 
-        // ADMIN
+        // =============================
+        // ADMIN.HTML
+        // =============================
         if (pagina.includes("admin.html")) {
 
             if (tipo !== "admin") {
 
                 window.location.href =
-                    "user.html";
+                    "login.html";
 
                 return;
             }
@@ -872,6 +887,38 @@ document.addEventListener(
             }
 
             carregarUsuarios();
+
+            return;
+        }
+
+        // =============================
+        // CADASTRO.HTML
+        // =============================
+        if (pagina.includes("cadastro.html")) {
+
+            if (tipo !== "admin") {
+
+                window.location.href =
+                    "login.html";
+
+                return;
+            }
+
+            return;
+        }
+
+        // =============================
+        // UPLOAD.HTML
+        // =============================
+        if (pagina.includes("upload.html")) {
+
+            if (tipo !== "admin") {
+
+                window.location.href =
+                    "login.html";
+
+                return;
+            }
 
             return;
         }
