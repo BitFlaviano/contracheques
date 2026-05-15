@@ -76,10 +76,23 @@ async function fazerLogin() {
         const user = data.user;
         const tipo = user.user_metadata?.tipo;
 
-        if (tipo === 'admin') {
-            window.location.href = 'admin.html';
+        if (tipo === "admin") {
+
+            window.location.href =
+                "admin.html";
+
+        } else if (
+            tipo === "user" ||
+            tipo === "funcionario"
+        ) {
+
+            window.location.href =
+                "user.html";
+
         } else {
-            window.location.href = 'user.html';
+
+            erroDisplay.innerText =
+                "Tipo de usuário inválido.";
         }
 
     } catch (err) {
@@ -1001,7 +1014,10 @@ document.addEventListener(
                 pagina.includes("user")
             ) {
 
-                if (tipo !== "user") {
+               if (
+                    tipo !== "user" &&
+                    tipo !== "funcionario"
+                ) {
 
                     window.location.href =
                         "login.html";
