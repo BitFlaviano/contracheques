@@ -14,6 +14,7 @@ const API_URL = "";
 let userIdSelecionado = null;
 let fazendoLogin = false;
 let enviandoArquivo = false;
+let arquivoPendente = null;
 
 // =============================
 // VALIDAÇÕES
@@ -231,33 +232,112 @@ async function carregarDashboard(user) {
 // =============================
 async function baixarArquivo(caminho) {
 
-    const { data, error } =
-        await client.storage
-            .from('contracheques')
-            .download(caminho);
+    arquivoPendente = caminho;
 
-    if (error) {
+    const modal =
+        document.getElementById(
+            "modal-termos"
+        );
 
-        alert("Erro ao baixar arquivo.");
-        console.error(error);
+    if (modal) {
+        modal.style.display = "flex";
+    }
+}
+
+async function confirmarDownload() {
+
+    const checkbox =
+        document.getElementById(
+            "aceite-termos"
+        );
+
+    if (!checkbox.checked) {
+
+        alert(
+            "Você deve aceitar os termos."
+        );
 
         return;
     }
 
-    const url = URL.createObjectURL(data);
+    const { data } =
+        await client.auth.getUser();
 
-    const a = document.createElement('a');
+    const user = data.user;
+
+    // salva confirmação
+    const { error: erroConfirmacao } =
+        await client
+            .from(
+                "confirmacoes_contracheque"
+            )
+            .insert({
+                user_id: user.id,
+                nome_usuario:
+                    user.user_metadata
+                    ?.full_name || "",
+                arquivo: arquivoPendente,
+                confirmado: true
+            });
+
+    if (erroConfirmacao) {
+
+        alert(
+            "Erro ao registrar confirmação."
+        );
+
+        console.error(
+            erroConfirmacao
+        );
+
+        return;
+    }
+
+    // baixa arquivo
+    const { data: arquivo, error } =
+        await client.storage
+            .from("contracheques")
+            .download(arquivoPendente);
+
+    if (error) {
+
+        alert("Erro ao baixar.");
+
+        return;
+    }
+
+    const url =
+        URL.createObjectURL(arquivo);
+
+    const a =
+        document.createElement("a");
 
     a.href = url;
-    a.download = caminho.split('/').pop();
 
-    document.body.appendChild(a);
+    a.download =
+        arquivoPendente
+            .split("/")
+            .pop();
 
     a.click();
 
-    document.body.removeChild(a);
-
     URL.revokeObjectURL(url);
+
+    // fecha modal
+    document.getElementById(
+        "modal-termos"
+    ).style.display = "none";
+
+    checkbox.checked = false;
+
+    document
+    .getElementById(
+        "btn-confirmar-download"
+    )
+    ?.addEventListener(
+        "click",
+        confirmarDownload
+    );
 }
 
 // =============================
@@ -876,26 +956,23 @@ document.addEventListener(
     async () => {
 
         const pagina =
-            window.location.pathname;
-
-        const paginasPublicas = [
-            "/",
-            "/login.html"
-        ];
-
-        // libera login imediatamente
-        if (
-            paginasPublicas.includes(pagina)
-        ) {
-
-            document.body.style.display =
-                "block";
-
-            return;
-        }
+            window.location.pathname
+            .toLowerCase();
 
         try {
 
+            // páginas públicas
+            if (
+                pagina.includes("login")
+            ) {
+
+                document.body.style.display =
+                    "block";
+
+                return;
+            }
+
+            // valida sessão
             const { data } =
                 await client.auth.getUser();
 
@@ -913,31 +990,11 @@ document.addEventListener(
             const tipo =
                 user.user_metadata?.tipo;
 
-            // ADMIN ONLY
-            const paginasAdmin = [
-                "/admin.html",
-                "/upload.html",
-                "/cadastro.html"
-            ];
-
+            // =============================
+            // USER
+            // =============================
             if (
-                paginasAdmin.some(p =>
-                    pagina.includes(p)
-                )
-            ) {
-
-                if (tipo !== "admin") {
-
-                    window.location.href =
-                        "login.html";
-
-                    return;
-                }
-            }
-
-            // USER ONLY
-            if (
-                pagina.includes("user.html")
+                pagina.includes("user")
             ) {
 
                 if (tipo !== "user") {
@@ -951,15 +1008,58 @@ document.addEventListener(
                 carregarDashboard(user);
             }
 
-            // admin dashboard
+            // =============================
+            // ADMIN
+            // =============================
             if (
-                pagina.includes("admin.html")
+                pagina.includes("admin")
             ) {
 
+                if (tipo !== "admin") {
+
+                    window.location.href =
+                        "login.html";
+
+                    return;
+                }
+
                 carregarUsuarios();
+                carregarContrachequesAdmin(user);
             }
 
-            // libera página SOMENTE após validação
+            // =============================
+            // CADASTRO
+            // =============================
+            if (
+                pagina.includes("cadastro")
+            ) {
+
+                if (tipo !== "admin") {
+
+                    window.location.href =
+                        "login.html";
+
+                    return;
+                }
+            }
+
+            // =============================
+            // UPLOAD
+            // =============================
+            if (
+                pagina.includes("upload")
+            ) {
+
+                if (tipo !== "admin") {
+
+                    window.location.href =
+                        "login.html";
+
+                    return;
+                }
+            }
+
+            // libera página
             document.body.style.display =
                 "block";
 
