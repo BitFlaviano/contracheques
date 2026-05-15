@@ -269,8 +269,72 @@ async function cadastrar() {
     const email = document.getElementById("email")?.value.trim();
     const senha = document.getElementById("senha")?.value;
     const cpf = document.getElementById("cpf")?.value.trim();
-    const tipo = document.getElementById("tipo")?.value;
-    const msg = document.getElementById("msg");
+    const tipo = document.getElementById("tipo").value;
+const msg = document.getElementById("msg");
+
+// remove caracteres não numéricos
+const cpfLimpo = cpf.replace(/\D/g, "");
+
+// valida tamanho
+if (cpfLimpo.length !== 11) {
+
+    msg.innerText = "CPF inválido.";
+    msg.style.color = "red";
+
+    return;
+}
+
+// evita sequências iguais
+if (/^(\d)\1+$/.test(cpfLimpo)) {
+
+    msg.innerText = "CPF inválido.";
+    msg.style.color = "red";
+
+    return;
+}
+
+// valida dígitos do CPF
+function validarCPF(cpf) {
+
+    let soma = 0;
+    let resto;
+
+    for (let i = 1; i <= 9; i++) {
+        soma += parseInt(cpf.substring(i - 1, i)) * (11 - i);
+    }
+
+    resto = (soma * 10) % 11;
+
+    if (resto === 10 || resto === 11) {
+        resto = 0;
+    }
+
+    if (resto !== parseInt(cpf.substring(9, 10))) {
+        return false;
+    }
+
+    soma = 0;
+
+    for (let i = 1; i <= 10; i++) {
+        soma += parseInt(cpf.substring(i - 1, i)) * (12 - i);
+    }
+
+    resto = (soma * 10) % 11;
+
+    if (resto === 10 || resto === 11) {
+        resto = 0;
+    }
+
+    return resto === parseInt(cpf.substring(10, 11));
+}
+
+if (!validarCPF(cpfLimpo)) {
+
+    msg.innerText = "CPF inválido.";
+    msg.style.color = "red";
+
+    return;
+}
 
     try {
 
@@ -312,7 +376,7 @@ async function cadastrar() {
                 nome,
                 email,
                 senha,
-                cpf,
+                cpf: cpfLimpo,
                 tipo
             })
         });
@@ -805,7 +869,7 @@ async function enviarPDF() {
 }
 
 // =============================
-// INICIALIZAÇÃO
+// INICIALIZAÇÃO SEGURA
 // =============================
 document.addEventListener(
     "DOMContentLoaded",
@@ -814,113 +878,97 @@ document.addEventListener(
         const pagina =
             window.location.pathname;
 
-        // páginas públicas
         const paginasPublicas = [
             "/",
             "/login.html"
         ];
 
-        // LOGIN
-        if (paginasPublicas.includes(pagina)) {
+        // libera login imediatamente
+        if (
+            paginasPublicas.includes(pagina)
+        ) {
+
+            document.body.style.display =
+                "block";
+
             return;
         }
 
-        // valida sessão
-        const { data } =
-            await client.auth.getUser();
+        try {
 
-        const user = data.user;
+            const { data } =
+                await client.auth.getUser();
 
-        // sem login
-        if (!user) {
+            const user = data.user;
+
+            // sem login
+            if (!user) {
+
+                window.location.href =
+                    "login.html";
+
+                return;
+            }
+
+            const tipo =
+                user.user_metadata?.tipo;
+
+            // ADMIN ONLY
+            const paginasAdmin = [
+                "/admin.html",
+                "/upload.html",
+                "/cadastro.html"
+            ];
+
+            if (
+                paginasAdmin.some(p =>
+                    pagina.includes(p)
+                )
+            ) {
+
+                if (tipo !== "admin") {
+
+                    window.location.href =
+                        "login.html";
+
+                    return;
+                }
+            }
+
+            // USER ONLY
+            if (
+                pagina.includes("user.html")
+            ) {
+
+                if (tipo !== "user") {
+
+                    window.location.href =
+                        "login.html";
+
+                    return;
+                }
+
+                carregarDashboard(user);
+            }
+
+            // admin dashboard
+            if (
+                pagina.includes("admin.html")
+            ) {
+
+                carregarUsuarios();
+            }
+
+            // libera página SOMENTE após validação
+            document.body.style.display =
+                "block";
+
+        } catch (err) {
+
+            console.error(err);
 
             window.location.href =
                 "login.html";
-
-            return;
-        }
-
-        const tipo =
-            user.user_metadata?.tipo;
-
-        // =============================
-        // USER.HTML
-        // =============================
-        if (pagina.includes("user.html")) {
-
-            if (tipo !== "user") {
-
-                window.location.href =
-                    "login.html";
-
-                return;
-            }
-
-            carregarDashboard(user);
-
-            return;
-        }
-
-        // =============================
-        // ADMIN.HTML
-        // =============================
-        if (pagina.includes("admin.html")) {
-
-            if (tipo !== "admin") {
-
-                window.location.href =
-                    "login.html";
-
-                return;
-            }
-
-            const nomeUsuario =
-                document.getElementById(
-                    "nome-usuario"
-                );
-
-            if (nomeUsuario) {
-
-                nomeUsuario.innerText =
-                    user.user_metadata?.full_name ||
-                    "Administrador";
-            }
-
-            carregarUsuarios();
-
-            return;
-        }
-
-        // =============================
-        // CADASTRO.HTML
-        // =============================
-        if (pagina.includes("cadastro.html")) {
-
-            if (tipo !== "admin") {
-
-                window.location.href =
-                    "login.html";
-
-                return;
-            }
-
-            return;
-        }
-
-        // =============================
-        // UPLOAD.HTML
-        // =============================
-        if (pagina.includes("upload.html")) {
-
-            if (tipo !== "admin") {
-
-                window.location.href =
-                    "login.html";
-
-                return;
-            }
-
-            return;
         }
     }
 );
