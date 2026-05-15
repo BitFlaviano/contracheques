@@ -1128,3 +1128,197 @@ document.addEventListener("keydown", function(event) {
         fecharModalEditar();
     }
 });
+
+// ===========================================
+// CARREGAR CONTRACHEQUES DO ADMIN
+// ===========================================
+async function carregarContrachequesAdmin(user) {
+
+    const lista =
+        document.getElementById(
+            "lista-arquivos-admin"
+        );
+
+    const loading =
+        document.getElementById(
+            "loading-admin"
+        );
+
+    if (!lista) return;
+
+    // loading seguro
+    if (loading) {
+        loading.style.display = "block";
+    }
+
+    lista.innerHTML = "";
+
+    try {
+
+        const nomeUsuario =
+            user.user_metadata?.full_name || "";
+
+        const nomeNormalizado =
+            nomeUsuario
+                .normalize("NFD")
+                .replace(
+                    /[\u0300-\u036f]/g,
+                    ""
+                )
+                .toUpperCase()
+                .trim();
+
+        let arquivosEncontrados = [];
+
+        // =============================
+        // LISTA PASTAS
+        // =============================
+        const {
+            data: pastas,
+            error: erroPastas
+        } = await client.storage
+            .from("contracheques")
+            .list("", {
+                limit: 100
+            });
+
+        if (erroPastas) {
+
+            console.error(
+                "ERRO STORAGE:",
+                erroPastas
+            );
+
+            lista.innerHTML =
+                "Erro ao acessar storage.";
+
+            return;
+        }
+
+        // =============================
+        // PERCORRE PASTAS
+        // =============================
+        for (const pasta of pastas) {
+
+            const {
+                data: arquivos,
+                error: erroArquivos
+            } = await client.storage
+                .from("contracheques")
+                .list(pasta.name, {
+                    limit: 100
+                });
+
+            if (erroArquivos) {
+
+                console.error(
+                    "ERRO ARQUIVOS:",
+                    erroArquivos
+                );
+
+                continue;
+            }
+
+            if (!arquivos) continue;
+
+            arquivos.forEach(file => {
+
+                const nomeArquivo =
+                    file.name
+                        .normalize("NFD")
+                        .replace(
+                            /[\u0300-\u036f]/g,
+                            ""
+                        )
+                        .toUpperCase()
+                        .trim();
+
+                // ADMIN vê apenas os próprios
+                if (
+                    nomeArquivo.includes(
+                        nomeNormalizado
+                    )
+                ) {
+
+                    arquivosEncontrados.push({
+                        nome: file.name,
+                        caminho:
+                            `${pasta.name}/${file.name}`
+                    });
+                }
+            });
+        }
+
+        // =============================
+        // SEM ARQUIVOS
+        // =============================
+        if (
+            arquivosEncontrados.length === 0
+        ) {
+
+            lista.innerHTML =
+                "Nenhum contracheque encontrado.";
+
+            return;
+        }
+
+        // =============================
+        // RENDERIZA
+        // =============================
+        arquivosEncontrados.forEach(file => {
+
+            const div =
+                document.createElement("div");
+
+            div.className =
+                "documento";
+
+            // evita innerHTML inseguro
+            const span =
+                document.createElement("span");
+
+            span.textContent =
+                file.nome;
+
+            const botao =
+                document.createElement("button");
+
+            botao.className =
+                "btn-download";
+
+            botao.textContent =
+                "Baixar";
+
+            botao.addEventListener(
+                "click",
+                () => {
+                    baixarArquivo(
+                        file.caminho
+                    );
+                }
+            );
+
+            div.appendChild(span);
+            div.appendChild(botao);
+
+            lista.appendChild(div);
+        });
+
+    } catch (err) {
+
+        console.error(
+            "ERRO GERAL:",
+            err
+        );
+
+        lista.innerHTML =
+            "Erro inesperado.";
+
+    } finally {
+
+        if (loading) {
+            loading.style.display =
+                "none";
+        }
+    }
+}
