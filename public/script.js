@@ -978,6 +978,10 @@ document.addEventListener(
 
             const user = data.user;
 
+            console.log(user);
+            console.log(user.user_metadata);
+            console.log(user.user_metadata?.tipo);
+
             // sem login
             if (!user) {
 
