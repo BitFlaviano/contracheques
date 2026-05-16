@@ -15,6 +15,7 @@ let userIdSelecionado = null;
 let fazendoLogin = false;
 let enviandoArquivo = false;
 let arquivoPendente = null;
+let confirmandoDownload = false;
 
 // =============================
 // VALIDAÇÕES
@@ -117,6 +118,14 @@ async function fazerLogout() {
     await client.auth.signOut();
 
     window.location.href = 'login.html';
+}
+
+function irCadastro() {
+    window.location.href = "cadastro.html";
+}
+
+function irUpload() {
+    window.location.href = "upload.html";
 }
 
 // =============================
@@ -245,19 +254,89 @@ async function carregarDashboard(user) {
 // =============================
 async function baixarArquivo(caminho) {
 
-    arquivoPendente = caminho;
+    try {
 
-    const modal =
-        document.getElementById(
-            "modal-termos"
+        const session = await client.auth.getSession();
+        const token = session.data.session?.access_token;
+
+        if (!token) {
+            window.location.href = "login.html";
+            return;
+        }
+
+        const res = await fetch(
+            `${API_URL}/confirmacoes/status?arquivo=${encodeURIComponent(caminho)}`,
+            {
+                headers: {
+                    Authorization: `Bearer ${token}`
+                }
+            }
         );
 
-    if (modal) {
-        modal.style.display = "flex";
+        if (!res.ok) {
+            throw new Error("Erro ao verificar confirmação.");
+        }
+
+        const data = await res.json();
+
+        if (data.confirmado) {
+            await baixarArquivoConfirmado(caminho);
+            return;
+        }
+
+        arquivoPendente = caminho;
+
+        const modal =
+            document.getElementById(
+                "modal-termos"
+            );
+
+        if (modal) {
+            modal.style.display = "flex";
+        }
+
+    } catch (err) {
+
+        console.error(err);
+        alert("Erro ao verificar confirmação do documento.");
     }
 }
 
+async function baixarArquivoConfirmado(caminho) {
+
+    const { data: arquivo, error } =
+        await client.storage
+            .from("contracheques")
+            .download(caminho);
+
+    if (error) {
+        alert("Erro ao baixar.");
+        return false;
+    }
+
+    const url =
+        URL.createObjectURL(arquivo);
+
+    const a =
+        document.createElement("a");
+
+    a.href = url;
+
+    a.download =
+        caminho
+            .split("/")
+            .pop();
+
+    a.click();
+
+    URL.revokeObjectURL(url);
+
+    return true;
+}
+
 async function confirmarDownload() {
+
+    if (confirmandoDownload) return;
 
     const checkbox =
         document.getElementById(
@@ -277,80 +356,71 @@ async function confirmarDownload() {
         await client.auth.getUser();
 
     const user = data.user;
+    const session = await client.auth.getSession();
+    const token = session.data.session?.access_token;
 
-    // salva confirmação
-    const { error: erroConfirmacao } =
-        await client
-            .from(
-                "confirmacoes_contracheque"
-            )
-            .insert({
-                user_id: user.id,
-                nome_usuario:
-                    user.user_metadata
-                    ?.full_name || "",
-                arquivo: arquivoPendente,
-                confirmado: true
-            });
-
-    if (erroConfirmacao) {
-
-        alert(
-            "Erro ao registrar confirmação."
-        );
-
-        console.error(
-            erroConfirmacao
-        );
-
+    if (!token || !user) {
+        window.location.href = "login.html";
         return;
     }
 
-    // baixa arquivo
-    const { data: arquivo, error } =
-        await client.storage
-            .from("contracheques")
-            .download(arquivoPendente);
+    confirmandoDownload = true;
 
-    if (error) {
+    try {
 
-        alert("Erro ao baixar.");
+        const resConfirmacao = await fetch(`${API_URL}/confirmacoes`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${token}`
+            },
+            body: JSON.stringify({
+                arquivo: arquivoPendente
+            })
+        });
 
-        return;
+        if (!resConfirmacao.ok) {
+            const erro = await resConfirmacao.json().catch(() => ({}));
+            alert(erro?.erro || "Erro ao registrar confirmação.");
+            return;
+        }
+
+        const baixou = await baixarArquivoConfirmado(arquivoPendente);
+
+        if (!baixou) return;
+
+        // fecha modal
+        document.getElementById(
+            "modal-termos"
+        ).style.display = "none";
+
+        checkbox.checked = false;
+        arquivoPendente = null;
+
+        if (typeof carregarConfirmacoes === "function") {
+            carregarConfirmacoes();
+        }
+
+    } finally {
+        confirmandoDownload = false;
     }
 
-    const url =
-        URL.createObjectURL(arquivo);
+}
 
-    const a =
-        document.createElement("a");
+function fecharModalTermos() {
+    const modal = document.getElementById("modal-termos");
+    const checkbox = document.getElementById("aceite-termos");
 
-    a.href = url;
+    if (modal) {
+        modal.style.display = "none";
+    }
 
-    a.download =
-        arquivoPendente
-            .split("/")
-            .pop();
+    if (checkbox) {
+        checkbox.checked = false;
+    }
 
-    a.click();
-
-    URL.revokeObjectURL(url);
-
-    // fecha modal
-    document.getElementById(
-        "modal-termos"
-    ).style.display = "none";
-
-    checkbox.checked = false;
-
-    document
-    .getElementById(
-        "btn-confirmar-download"
-    )
-    ?.addEventListener(
-        "click",
-        confirmarDownload
-    );
+    arquivoPendente = null;
+    confirmandoDownload = false;
 }
 
 // =============================
@@ -684,6 +754,123 @@ async function carregarUsuarios() {
     }
 }
 
+function formatarDataHora(valor) {
+    if (!valor) return "-";
+
+    const data = new Date(valor);
+
+    if (Number.isNaN(data.getTime())) {
+        return "-";
+    }
+
+    return data.toLocaleString("pt-BR", {
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit"
+    });
+}
+
+// =============================
+// CARREGAR CONFIRMAÇÕES
+// =============================
+async function carregarConfirmacoes() {
+
+    const lista = document.getElementById("lista-confirmacoes");
+    const loading = document.getElementById("loading-confirmacoes");
+
+    if (!lista) return;
+
+    lista.innerHTML = "";
+
+    if (loading) {
+        loading.style.display = "block";
+    }
+
+    try {
+
+        const session = await client.auth.getSession();
+        const token = session.data.session?.access_token;
+
+        if (!token) {
+            window.location.href = "login.html";
+            return;
+        }
+
+        const res = await fetch(`${API_URL}/confirmacoes`, {
+            headers: {
+                Authorization: `Bearer ${token}`
+            }
+        });
+
+        if (!res.ok) {
+            throw new Error("Erro ao carregar confirmações");
+        }
+
+        const confirmacoes = await res.json();
+
+        if (!confirmacoes || confirmacoes.length === 0) {
+            lista.innerHTML = "<p>Nenhuma confirmação encontrada.</p>";
+            return;
+        }
+
+        const tabela = document.createElement("div");
+        tabela.className = "confirmacoes-lista";
+
+        confirmacoes.forEach(confirmacao => {
+            const item = document.createElement("div");
+            item.className = "confirmacao";
+
+            const info = document.createElement("div");
+            info.className = "confirmacao-info";
+
+            const nome = document.createElement("strong");
+            nome.textContent = confirmacao.nome_usuario || "Sem nome";
+
+            const arquivo = document.createElement("span");
+            arquivo.textContent = confirmacao.arquivo || "Arquivo não informado";
+
+            const data = document.createElement("small");
+            data.textContent = formatarDataHora(
+                confirmacao.created_at ||
+                confirmacao.data ||
+                confirmacao.data_confirmacao
+            );
+
+            info.appendChild(nome);
+            info.appendChild(arquivo);
+            info.appendChild(data);
+
+            const status = document.createElement("span");
+            status.className = confirmacao.confirmado
+                ? "status-confirmado"
+                : "status-pendente";
+            status.textContent = confirmacao.confirmado
+                ? "Confirmado"
+                : "Pendente";
+
+            item.appendChild(info);
+            item.appendChild(status);
+            tabela.appendChild(item);
+        });
+
+        lista.appendChild(tabela);
+
+    } catch (err) {
+
+        console.error("ERRO AO CARREGAR CONFIRMAÇÕES:", err);
+
+        lista.innerHTML = "Erro ao carregar confirmações.";
+
+    } finally {
+
+        if (loading) {
+            loading.style.display = "none";
+        }
+    }
+}
+
 // =============================
 // EXCLUIR USUÁRIO
 // =============================
@@ -825,6 +1012,7 @@ async function confirmarAlteracaoCadastro() {
                 fecharModalEditar();
 
                 carregarUsuarios();
+                carregarConfirmacoes();
 
             }, 1500);
 
@@ -967,6 +1155,9 @@ async function enviarPDF() {
 document.addEventListener(
     "DOMContentLoaded",
     async () => {
+        document
+            .getElementById("btn-confirmar-download")
+            ?.addEventListener("click", confirmarDownload);
 
         const pagina =
             window.location.pathname
@@ -980,7 +1171,7 @@ document.addEventListener(
             ) {
 
                 document.body.style.display =
-                    "block";
+                    "";
 
                 return;
             }
@@ -990,10 +1181,6 @@ document.addEventListener(
                 await client.auth.getUser();
 
             const user = data.user;
-
-            console.log(user);
-            console.log(user.user_metadata);
-            console.log(user.user_metadata?.tipo);
 
             // sem login
             if (!user) {
@@ -1044,6 +1231,8 @@ document.addEventListener(
                 }
 
                 carregarUsuarios();
+                carregarConfirmacoes();
+                carregarDashboard(user);
                 carregarContrachequesAdmin(user);
             }
 
@@ -1081,7 +1270,7 @@ document.addEventListener(
 
             // libera página
             document.body.style.display =
-                "block";
+                "";
 
         } catch (err) {
 
@@ -1126,6 +1315,16 @@ document.addEventListener("keydown", function(event) {
         modal.style.display === "flex"
     ) {
         fecharModalEditar();
+    }
+
+    const modalTermos =
+        document.getElementById("modal-termos");
+
+    if (
+        modalTermos &&
+        modalTermos.style.display === "flex"
+    ) {
+        fecharModalTermos();
     }
 });
 

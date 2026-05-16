@@ -60,9 +60,16 @@
         </div>
     </div>
 
-    
+    <div class="container">
+        <div class="card">
+            <h3>Confirmações de Recebimento</h3>
+            <div id="loading-confirmacoes" style="display:none;">
+                <div class="dots"></div>
+            </div>
 
-    <div id="lista-usuarios"></div>
+            <div id="lista-confirmacoes"></div>
+        </div>
+    </div>
 
     <!-- MODAL ALTERAR SENHA -->
     <div id="modal-senha" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); justify-content:center; align-items:center;">
@@ -91,20 +98,32 @@
             <button onclick="fecharModalEditar()">Cancelar</button>
         </div>
     </div>
-    <script>
-    window.addEventListener("DOMContentLoaded", async () => {
 
-        const { data } = await client.auth.getUser();
+    <div id="modal-termos" class="modal" style="display:none;">
+        <div class="modal-content">
+            <h3>Confirmação</h3>
 
-        if (!data.user) {
-            window.location.href = "login.html";
-            return;
-        }
+            <p>
+                Declaro que ao clicar no botão download
+                confirmo o recebimento do documento.
+            </p>
 
-        carregarDashboard(data.user);
-        carregarUsuarios();
-        });
-    </script>
+            <label class="check-termo">
+                <input type="checkbox" id="aceite-termos">
+                Li e concordo.
+            </label>
+
+            <button id="btn-confirmar-download">
+                Confirmar Download
+            </button>
+
+            <button type="button" onclick="fecharModalTermos()">
+                Fechar
+            </button>
+        </div>
+    </div>
+
+    <footer class="site-footer">Copyright Flaviano Porto 2026</footer>
     <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
     <script src="script.js"></script>
 </body>

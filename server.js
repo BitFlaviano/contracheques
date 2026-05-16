@@ -2,6 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const multer = require('multer');
 const { createClient } = require('@supabase/supabase-js');
+const WebSocket = require('ws');
 const { PDFDocument } = require('pdf-lib');
 const pdfParse = require('pdf-parse');
 //const pdf = require('pdf-parse');
@@ -19,9 +20,53 @@ app.use(express.static(path.join(__dirname, 'public')));
 // =============================
 const SUPABASE_URL = 'https://uatryxvylqwslnaxggjk.supabase.co';
 const SUPABASE_SERVICE_ROLE = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVhdHJ5eHZ5bHF3c2xuYXhnZ2prIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NzAwODk5OSwiZXhwIjoyMDkyNTg0OTk5fQ.Sy3jX2ZbRFIHR2GI_8TrOE4uxMQz__K3MqK-LClsMwg';
-const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE);
+const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE, {
+    realtime: { transport: WebSocket }
+});
 
 const upload = multer({ storage: multer.memoryStorage() });
+
+async function validarAdmin(req, res) {
+    const authHeader = req.headers.authorization || "";
+    const token = authHeader.startsWith("Bearer ")
+        ? authHeader.slice(7)
+        : null;
+
+    if (!token) {
+        res.status(403).json({ erro: "Acesso negado" });
+        return null;
+    }
+
+    const { data, error } = await supabaseAdmin.auth.getUser(token);
+
+    if (error || data.user?.user_metadata?.tipo !== "admin") {
+        res.status(403).json({ erro: "Acesso negado" });
+        return null;
+    }
+
+    return data.user;
+}
+
+async function validarUsuario(req, res) {
+    const authHeader = req.headers.authorization || "";
+    const token = authHeader.startsWith("Bearer ")
+        ? authHeader.slice(7)
+        : null;
+
+    if (!token) {
+        res.status(403).json({ erro: "Acesso negado" });
+        return null;
+    }
+
+    const { data, error } = await supabaseAdmin.auth.getUser(token);
+
+    if (error || !data.user) {
+        res.status(403).json({ erro: "Acesso negado" });
+        return null;
+    }
+
+    return data.user;
+}
 
 // =============================
 // FUNÇÃO: GERAR TIMESTAMP
@@ -184,9 +229,8 @@ app.post('/upload', upload.single('pdf'), async (req, res) => {
 // =============================
 app.get('/users', async (req, res) => {
     try {
-        if (req.headers.authorization !== "admin123") {
-            return res.status(403).json({ erro: "Acesso negado" });
-        }
+        const admin = await validarAdmin(req, res);
+        if (!admin) return;
 
         const { data, error } = await supabaseAdmin.auth.admin.listUsers();
 
@@ -204,9 +248,8 @@ app.get('/users', async (req, res) => {
 // =============================
 app.delete('/users/:id', async (req, res) => {
     try {
-        if (req.headers.authorization !== "admin123") {
-            return res.status(403).json({ erro: "Acesso negado" });
-        }
+        const admin = await validarAdmin(req, res);
+        if (!admin) return;
 
         const { error } = await supabaseAdmin.auth.admin.deleteUser(req.params.id);
 
@@ -224,9 +267,8 @@ app.delete('/users/:id', async (req, res) => {
 // =============================
 app.put('/users/:id', async (req, res) => {
     try {
-        if (req.headers.authorization !== "admin123") {
-            return res.status(403).json({ erro: "Acesso negado" });
-        }
+        const admin = await validarAdmin(req, res);
+        if (!admin) return;
 
         const userId = req.params.id;
         const { email, senha } = req.body;
@@ -246,6 +288,122 @@ app.put('/users/:id', async (req, res) => {
         }
 
         res.json({ sucesso: true, user: data });
+
+    } catch (err) {
+        res.status(500).json({ erro: err.message });
+    }
+});
+
+// =============================
+// FUNÇÃO: REGISTRAR CONFIRMAÇÃO
+// =============================
+app.post('/confirmacoes', async (req, res) => {
+    try {
+        const user = await validarUsuario(req, res);
+        if (!user) return;
+
+        const { arquivo } = req.body;
+
+        if (!arquivo) {
+            return res.status(400).json({ erro: "Arquivo não informado" });
+        }
+
+        const { data: existente, error: erroBusca } = await supabaseAdmin
+            .from('confirmacoes_contracheque')
+            .select('*')
+            .eq('user_id', user.id)
+            .eq('arquivo', arquivo)
+            .limit(1);
+
+        if (erroBusca) return res.status(400).json({ erro: erroBusca.message });
+
+        if (existente && existente.length > 0) {
+            return res.json({ sucesso: true, existente: true });
+        }
+
+        const { error: erroInsert } = await supabaseAdmin
+            .from('confirmacoes_contracheque')
+            .insert({
+                user_id: user.id,
+                nome_usuario: user.user_metadata?.full_name || "",
+                arquivo,
+                confirmado: true
+            });
+
+        if (erroInsert) return res.status(400).json({ erro: erroInsert.message });
+
+        res.json({ sucesso: true, existente: false });
+
+    } catch (err) {
+        res.status(500).json({ erro: err.message });
+    }
+});
+
+// =============================
+// FUNÇÃO: VERIFICAR CONFIRMAÇÃO
+// =============================
+app.get('/confirmacoes/status', async (req, res) => {
+    try {
+        const user = await validarUsuario(req, res);
+        if (!user) return;
+
+        const arquivo = req.query.arquivo;
+
+        if (!arquivo) {
+            return res.status(400).json({ erro: "Arquivo não informado" });
+        }
+
+        const { data, error } = await supabaseAdmin
+            .from('confirmacoes_contracheque')
+            .select('*')
+            .eq('user_id', user.id)
+            .eq('arquivo', arquivo)
+            .limit(1);
+
+        if (error) return res.status(400).json({ erro: error.message });
+
+        res.json({ confirmado: !!(data && data.length > 0) });
+
+    } catch (err) {
+        res.status(500).json({ erro: err.message });
+    }
+});
+
+// =============================
+// FUNÇÃO: LISTAR CONFIRMAÇÕES
+// =============================
+app.get('/confirmacoes', async (req, res) => {
+    try {
+        const admin = await validarAdmin(req, res);
+        if (!admin) return;
+
+        const { data, error } = await supabaseAdmin
+            .from('confirmacoes_contracheque')
+            .select('*')
+            .limit(100);
+
+        if (error) return res.status(400).json({ erro: error.message });
+
+        const confirmacoesOrdenadas = (data || []).sort((a, b) => {
+            const dataA = new Date(a.created_at || a.data || a.data_confirmacao || 0).getTime();
+            const dataB = new Date(b.created_at || b.data || b.data_confirmacao || 0).getTime();
+
+            return dataB - dataA;
+        });
+
+        const confirmacoes = [];
+        const vistos = new Set();
+
+        for (const confirmacao of confirmacoesOrdenadas) {
+            const chave = `${confirmacao.user_id || ""}::${confirmacao.arquivo || ""}`;
+
+            if (vistos.has(chave)) continue;
+
+            vistos.add(chave);
+            confirmacoes.push(confirmacao);
+        }
+
+        res.json(confirmacoes);
 
     } catch (err) {
         res.status(500).json({ erro: err.message });
