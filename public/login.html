@@ -11,6 +11,12 @@
 <body>
 
     <div class="card">
+         <img
+        src="https://kidverte.vteximg.com.br/arquivos/logo-new.png?v=636661474853570000"
+        alt="Kidverte"
+        class="logo-login"
+    >
+
         <h2>Acessar Portal</h2>
 
         <input type="email" id="email" placeholder="E-mail">
@@ -18,8 +24,13 @@
         <!-- <button id="btn-login" type="button">Entrar</button> -->
         <button type="button" onclick="fazerLogin()">Entrar</button>
         <p id="mensagem-erro" style="color:red;"></p>
+        <p class="forgot-password">
+        <a href="#" onclick="abrirRecuperacaoSenha()">
+            Esqueci a senha
+        </a>
+</p>
     </div>
-    <footer class="site-footer">Copyright Flaviano Porto 2026</footer>
+    <footer class="site-footer">&copy; Flaviano Porto 2026</footer>
     
     
     <script defer src="script.js"></script>

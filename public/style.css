@@ -6,6 +6,28 @@ body {
   background: #f4f4f9; 
 }
 
+.logo-login {
+    width: 180px;
+    max-width: 80%;
+    display: block;
+    margin: 0 auto 20px auto;
+}
+
+.forgot-password {
+    margin-top: 15px;
+    text-align: left;
+}
+
+.forgot-password a {
+    color: #2b7cff;
+    text-decoration: none;
+    font-size: 14px;
+}
+
+.forgot-password a:hover {
+    text-decoration: underline;
+}
+
 .card { 
   background: white; 
   padding: 30px; 
@@ -130,7 +152,7 @@ button:hover {
 }
 
 .dots {
-    width: 56px;
+    width: 28px;
     height: 26.9px;
     margin: 0 auto 10px auto;
     background: radial-gradient(circle closest-side,#474bff 90%,#0000) 0%   50%,
@@ -198,7 +220,7 @@ button:hover {
     align-items: center;
 }
 .dots {
-    width: 56px;
+    width: 28px;
     height: 26.9px;
     margin: 0 auto 10px auto;
     background: radial-gradient(circle closest-side,#474bff 90%,#0000) 0%   50%,

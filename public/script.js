@@ -110,6 +110,50 @@ async function fazerLogin() {
     }
 }
 
+// =====================================
+// CONTROLE DE SESSÃO POR INATIVIDADE
+// =====================================
+
+let tempoInatividade;
+const TEMPO_LIMITE = 3 * 60 * 1000; // 3 minutos
+
+function resetarTempoSessao() {
+
+    clearTimeout(tempoInatividade);
+
+    tempoInatividade = setTimeout(async () => {
+
+        alert(
+            "Sessão encerrada por inatividade."
+        );
+
+        await client.auth.signOut();
+
+        window.location.href =
+            "login.html";
+
+    }, TEMPO_LIMITE);
+}
+
+// eventos considerados interação
+[
+    "mousemove",
+    "mousedown",
+    "keypress",
+    "scroll",
+    "touchstart",
+    "click"
+].forEach(evento => {
+
+    document.addEventListener(
+        evento,
+        resetarTempoSessao
+    );
+});
+
+// inicia contador
+resetarTempoSessao();
+
 // =============================
 // LOGOUT
 // =============================
@@ -247,6 +291,44 @@ async function carregarDashboard(user) {
             btn.style.display = "flex";
         }
     }
+}
+
+// =====================================
+// RECUPERAÇÃO DE SENHA
+// =====================================
+
+async function abrirRecuperacaoSenha() {
+
+    const email = prompt(
+        "Digite seu e-mail cadastrado:"
+    );
+
+    if (!email) return;
+
+    const {
+        error
+    } = await client.auth.resetPasswordForEmail(
+        email,
+        {
+            redirectTo:
+                "https://contracheques.onrender.com/reset-password.html"
+        }
+    );
+
+    if (error) {
+
+        alert(
+            "Erro ao enviar e-mail."
+        );
+
+        console.error(error);
+
+        return;
+    }
+
+    alert(
+        "Link de recuperação enviado para seu e-mail."
+    );
 }
 
 // =============================
