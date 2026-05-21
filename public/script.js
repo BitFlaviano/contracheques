@@ -17,6 +17,7 @@ let enviandoArquivo = false;
 let arquivoPendente = null;
 let confirmandoDownload = false;
 
+
 // =============================
 // VALIDAÇÕES
 // =============================
@@ -329,7 +330,65 @@ async function abrirRecuperacaoSenha() {
     alert(
         "Link de recuperação enviado para seu e-mail."
     );
+
 }
+
+// =============================
+// ALTERAÇÃO NO ESQUECI A SENHA
+// =============================
+async function alterarSenha() {
+
+            const senha =
+                document.getElementById(
+                    "nova-senha"
+                ).value;
+
+            const msg =
+                document.getElementById(
+                    "msg"
+                );
+
+            if (senha.length < 6) {
+
+                msg.innerText =
+                    "Senha muito curta.";
+
+                msg.style.color =
+                    "red";
+
+                return;
+            }
+
+            const {
+                error
+            } = await client.auth.updateUser({
+                password: senha
+            });
+
+            if (error) {
+
+                msg.innerText =
+                    error.message;
+
+                msg.style.color =
+                    "red";
+
+                return;
+            }
+
+            msg.innerText =
+                "Senha alterada com sucesso!";
+
+            msg.style.color =
+                "green";
+
+            setTimeout(() => {
+
+                window.location.href =
+                    "login.html";
+
+            }, 2000);
+        }
 
 // =============================
 // BAIXAR ARQUIVO
