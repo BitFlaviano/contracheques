@@ -328,6 +328,44 @@ async function carregarDashboard(user) {
         }
     }
 
+// =====================================
+// RECUPERAÇÃO DE SENHA
+// =====================================
+
+async function abrirRecuperacaoSenha() {
+
+    const email = prompt(
+        "Digite seu e-mail cadastrado:"
+    );
+
+    if (!email) return;
+
+    const {
+        error
+    } = await client.auth.resetPasswordForEmail(
+        email,
+        {
+            redirectTo:
+                "https://contracheques.onrender.com/reset-password.html"
+        }
+    );
+
+    if (error) {
+
+        alert(
+            "Erro ao enviar e-mail."
+        );
+
+        console.error(error);
+
+        return;
+    }
+
+    alert(
+        "Link de recuperação enviado para seu e-mail."
+    );
+}
+
 // =============================
 // ALTERAÇÃO NO ESQUECI A SENHA
 // =============================
