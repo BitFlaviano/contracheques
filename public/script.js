@@ -298,40 +298,35 @@ async function carregarDashboard(user) {
 // RECUPERAÇÃO DE SENHA
 // =====================================
 
-async function abrirRecuperacaoSenha() {
+    async function recuperarSessao() {
 
-    const email = prompt(
-        "Digite seu e-mail cadastrado:"
-    );
+        const hash =
+            window.location.hash;
 
-    if (!email) return;
+        if (!hash) return;
 
-    const {
-        error
-    } = await client.auth.resetPasswordForEmail(
-        email,
-        {
-            redirectTo:
-                "https://contracheques.onrender.com/reset-password.html"
+        const params =
+            new URLSearchParams(
+                hash.substring(1)
+            );
+
+        const access_token =
+            params.get("access_token");
+
+        const refresh_token =
+            params.get("refresh_token");
+
+        if (
+            access_token &&
+            refresh_token
+        ) {
+
+            await client.auth.setSession({
+                access_token,
+                refresh_token
+            });
         }
-    );
-
-    if (error) {
-
-        alert(
-            "Erro ao enviar e-mail."
-        );
-
-        console.error(error);
-
-        return;
     }
-
-    alert(
-        "Link de recuperação enviado para seu e-mail."
-    );
-
-}
 
 // =============================
 // ALTERAÇÃO NO ESQUECI A SENHA
@@ -342,6 +337,22 @@ async function alterarSenha() {
                 document.getElementById(
                     "nova-senha"
                 ).value;
+
+            const confirmarSenha =
+                document.getElementById(
+                    "confirmar-senha"
+                ).value;
+
+            if (senha !== confirmarSenha) {
+
+                msg.innerText =
+                    "As senhas não coincidem.";
+
+                msg.style.color =
+                    "red";
+
+                return;
+            }    
 
             const msg =
                 document.getElementById(
@@ -388,7 +399,7 @@ async function alterarSenha() {
                     "login.html";
 
             }, 2000);
-        }
+        }           
 
 // =============================
 // BAIXAR ARQUIVO
