@@ -1541,12 +1541,8 @@ async function carregarSolicitacoes() {
             headers: { Authorization: `Bearer ${token}` }
         });
 
-        if (!res.ok) //throw new Error("Erro ao carregar solicitações");
-                        const erro = await res.text();
-
-                            console.error("ERRO BACKEND:", erro);
-
-                            throw new Error(erro);
+        if (!res.ok) throw new Error("Erro ao carregar solicitações");
+                        
 
 
         const solicitacoes = await res.json();
@@ -1696,12 +1692,8 @@ async function carregarAtestadosAdmin() {
             headers: { Authorization: `Bearer ${token}` }
         });
 
-        if (!res.ok) //throw new Error("Erro ao carregar atestados");
-                        const erro = await res.text();
-
-                        console.error("ERRO BACKEND:", erro);
-
-                        throw new Error(erro);
+        if (!res.ok) throw new Error("Erro ao carregar atestados");
+                        
 
         const atestados = await res.json();
 
