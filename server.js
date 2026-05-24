@@ -490,7 +490,7 @@ app.get('/solicitacoes-contracheques', async (req, res) => {
         let query = supabaseAdmin
             .from('solicitacoes_contracheques')
             .select('*')
-            .order('created_at', { ascending: false });
+            .order('criado_em', { ascending: false });
             
 
         if (user.user_metadata?.tipo !== 'admin') {
@@ -776,7 +776,7 @@ app.get('/atestados', async (req, res) => {
         const { data, error } = await supabaseAdmin
             .from('atestados')
             .select('*')
-            .order('created_at', { ascending: false })
+            .order('criado_em', { ascending: false })
             .limit(100);
 
         if (error) return res.status(400).json({ erro: error.message });
@@ -960,8 +960,8 @@ app.get('/confirmacoes', async (req, res) => {
         if (error) return res.status(400).json({ erro: error.message });
 
         const confirmacoesOrdenadas = (data || []).sort((a, b) => {
-            const dataA = new Date(a.created_at || a.data || a.data_confirmacao || 0).getTime();
-            const dataB = new Date(b.created_at || b.data || b.data_confirmacao || 0).getTime();
+            const dataA = new Date(a.criado_em || a.data || a.data_confirmacao || 0).getTime();
+            const dataB = new Date(b.criado_em || b.data || b.data_confirmacao || 0).getTime();
 
             return dataB - dataA;
         });
@@ -984,7 +984,7 @@ app.get('/confirmacoes', async (req, res) => {
 
             confirmacoes = confirmacoes.filter(confirmacao => {
                 const dataConfirmacao = new Date(
-                    confirmacao.created_at ||
+                    confirmacao.criado_em ||
                     confirmacao.data ||
                     confirmacao.data_confirmacao ||
                     0
