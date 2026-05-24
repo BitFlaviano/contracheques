@@ -509,37 +509,75 @@ app.get('/solicitacoes-contracheques', async (req, res) => {
 });
 
 app.put('/solicitacoes-contracheques/:id', async (req, res) => {
+
     try {
-        const admin = await validarAdmin(req, res);
-        if (!admin) return;
 
-        const { status } = req.body;
+        const user =
+            await validarUsuario(req, res);
 
-        if (!['aprovado', 'rejeitado'].includes(status)) {
-            return res.status(400).json({ erro: "Status inválido" });
+        if (!user) return;
+
+        if (
+            user.user_metadata?.tipo !== 'admin'
+        ) {
+
+            return res.status(403).json({
+                erro: 'Acesso negado'
+            });
         }
 
-        const atualizacao = {
+        const { id } = req.params;
+
+        const {
             status,
-            aprovado_por_id: admin.id,
-            aprovado_por_nome: admin.user_metadata?.full_name || admin.email || "Admin",
-            aprovado_em: new Date().toISOString(),
-            valido_ate: status === 'aprovado'
-                ? somarDias(new Date(), 15).toISOString()
-                : null
-        };
+            resposta_financeiro
+        } = req.body;
 
-        const { error } = await supabaseAdmin
-            .from('solicitacoes_contracheques')
-            .update(atualizacao)
-            .eq('id', req.params.id);
+        console.log("ID:", id);
+        console.log("BODY:", req.body);
 
-        if (error) return res.status(400).json({ erro: error.message });
+        const { data, error } =
+            await supabaseAdmin
+                .from('solicitacoes_contracheques')
+                .update({
 
-        res.json({ sucesso: true });
+                    status,
+
+                    resposta_financeiro,
+
+                    data_resposta:
+                        new Date()
+                })
+                .eq('id', id)
+                .select();
+
+        if (error) {
+
+            console.error(
+                "ERRO UPDATE:",
+                error
+            );
+
+            return res.status(400).json({
+                erro: error.message
+            });
+        }
+
+        res.json({
+            sucesso: true,
+            data
+        });
 
     } catch (err) {
-        res.status(500).json({ erro: err.message });
+
+        console.error(
+            "ERRO GERAL:",
+            err
+        );
+
+        res.status(500).json({
+            erro: err.message
+        });
     }
 });
 
@@ -984,7 +1022,7 @@ app.get('/confirmacoes', async (req, res) => {
 
             confirmacoes = confirmacoes.filter(confirmacao => {
                 const dataConfirmacao = new Date(
-                    confirmacao.criado_em ||
+                    confirmacao.created_at ||
                     confirmacao.data ||
                     confirmacao.data_confirmacao ||
                     0
