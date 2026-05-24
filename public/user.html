@@ -8,12 +8,21 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 
-<body style="display:none;">
+<body class="user-page" style="display:none;">
 
     <!-- HEADER -->
     <div class="header">
         <h1>Painel do Colaborador</h1>
-        <button onclick="fazerLogout()">Sair</button>
+        <div class="header-actions">
+            <button class="hamburger" type="button" onclick="toggleMenuMobile()">☰</button>
+            <button class="header-logout" onclick="fazerLogout()">Sair</button>
+        </div>
+    </div>
+
+    <div class="menu">
+        <button type="button" onclick="mostrarSecaoUser('secao-solicitacao')">Solicitar contracheques anteriores</button>
+        <button type="button" onclick="mostrarSecaoUser('secao-atestado')">Enviar atestado</button>
+        <button class="menu-logout" onclick="fazerLogout()">Sair</button>
     </div>
 
     <div class="container">
@@ -39,6 +48,52 @@
             <!-- <button id="btn-refresh" class="btn-refresh" onclick="recarregarContracheques()" style="display:none;">
             ⟳
             </button> -->
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="card">
+            <h3>Folha de Ponto</h3>
+            <p class="card-hint">Disponível até o último dia do mês.</p>
+            <div id="lista-ponto"></div>
+        </div>
+    </div>
+
+    <div class="container secao-menu-user" id="secao-solicitacao" hidden>
+        <div class="card">
+            <h3>Solicitar Contracheques Anteriores</h3>
+            <label for="solicitacao-ano">Ano</label>
+            <select id="solicitacao-ano"></select>
+
+            <fieldset class="month-grid">
+                <legend>Meses</legend>
+                <label><input type="checkbox" name="solicitacao-mes" value="janeiro"> Janeiro</label>
+                <label><input type="checkbox" name="solicitacao-mes" value="fevereiro"> Fevereiro</label>
+                <label><input type="checkbox" name="solicitacao-mes" value="março"> Março</label>
+                <label><input type="checkbox" name="solicitacao-mes" value="abril"> Abril</label>
+                <label><input type="checkbox" name="solicitacao-mes" value="maio"> Maio</label>
+                <label><input type="checkbox" name="solicitacao-mes" value="junho"> Junho</label>
+                <label><input type="checkbox" name="solicitacao-mes" value="julho"> Julho</label>
+                <label><input type="checkbox" name="solicitacao-mes" value="agosto"> Agosto</label>
+                <label><input type="checkbox" name="solicitacao-mes" value="setembro"> Setembro</label>
+                <label><input type="checkbox" name="solicitacao-mes" value="outubro"> Outubro</label>
+                <label><input type="checkbox" name="solicitacao-mes" value="novembro"> Novembro</label>
+                <label><input type="checkbox" name="solicitacao-mes" value="dezembro"> Dezembro</label>
+            </fieldset>
+
+            <textarea id="solicitacao-motivo" placeholder="Motivo da solicitação"></textarea>
+            <button class="btn-primary-action" type="button" onclick="solicitarContrachequeAnterior()">Solicitar</button>
+            <p id="msg-solicitacao"></p>
+            <div id="lista-solicitacoes-user"></div>
+        </div>
+    </div>
+
+    <div class="container secao-menu-user" id="secao-atestado" hidden>
+        <div class="card">
+            <h3>Enviar Atestado</h3>
+            <input class="file-input" type="file" id="arquivo-atestado" accept=".pdf,image/*">
+            <button class="btn-primary-action" type="button" onclick="enviarAtestado()">Enviar Atestado</button>
+            <p id="msg-atestado"></p>
         </div>
     </div>
 

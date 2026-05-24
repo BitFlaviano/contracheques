@@ -19,7 +19,7 @@
 
         <h2>Acessar Portal</h2>
 
-        <input type="email" id="email" placeholder="E-mail">
+        <input type="text" id="email" placeholder="E-mail ou CPF">
         <input type="password" id="password" placeholder="Senha">
         <!-- <button id="btn-login" type="button">Entrar</button> -->
         <button type="button" onclick="fazerLogin()">Entrar</button>
@@ -30,6 +30,18 @@
         </a>
 </p>
     </div>
+
+    <div id="modal-recuperacao" class="modal-login" style="display:none;">
+        <div class="modal-login-content">
+            <h3>Recuperar senha</h3>
+            <p>Informe o e-mail cadastrado. Verifique também a caixa de spam.</p>
+            <input type="email" id="email-recuperacao" placeholder="E-mail cadastrado">
+            <p id="msg-recuperacao"></p>
+            <button type="button" onclick="enviarRecuperacaoSenha()">Enviar link</button>
+            <button type="button" onclick="fecharRecuperacaoSenha()">Fechar</button>
+        </div>
+    </div>
+
     <footer class="site-footer">&copy; Flaviano Porto 2026</footer>
     
     

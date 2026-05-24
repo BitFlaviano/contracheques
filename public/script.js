@@ -41,7 +41,7 @@ async function fazerLogin() {
 
     fazendoLogin = true;
 
-    const email = document.getElementById('email')?.value.trim();
+    const login = document.getElementById('email')?.value.trim();
     const password = document.getElementById('password')?.value;
     const erroDisplay = document.getElementById('mensagem-erro');
 
@@ -51,10 +51,28 @@ async function fazerLogin() {
 
     try {
 
-        if (!email || !password) {
+        if (!login || !password) {
 
             if (erroDisplay) {
-                erroDisplay.innerText = "Preencha email e senha.";
+                erroDisplay.innerText = "Preencha e-mail/CPF e senha.";
+            }
+
+            return;
+        }
+
+        const resolveLogin = await fetch(`${API_URL}/resolve-login`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({ login })
+        });
+
+        const resolveData = await resolveLogin.json().catch(() => ({}));
+
+        if (!resolveLogin.ok || !resolveData.email) {
+            if (erroDisplay) {
+                erroDisplay.innerText = resolveData?.erro || "Login inválido.";
             }
 
             return;
@@ -62,7 +80,7 @@ async function fazerLogin() {
 
         const { data, error } =
             await client.auth.signInWithPassword({
-                email,
+                email: resolveData.email,
                 password
             });
 
@@ -77,6 +95,7 @@ async function fazerLogin() {
 
         const user = data.user;
         const tipo = user.user_metadata?.tipo;
+        localStorage.setItem("ultima_atividade", String(Date.now()));
 
         if (tipo === "admin") {
 
@@ -116,11 +135,15 @@ async function fazerLogin() {
 // =====================================
 
 let tempoInatividade;
-const TEMPO_LIMITE = 3 * 60 * 1000; // 3 minutos
+let controleSessaoAtivo = false;
+const TEMPO_LIMITE = 5 * 60 * 1000; // 5 minutos
 
 function resetarTempoSessao() {
 
+    if (!controleSessaoAtivo) return;
+
     clearTimeout(tempoInatividade);
+    localStorage.setItem("ultima_atividade", String(Date.now()));
 
     tempoInatividade = setTimeout(async () => {
 
@@ -134,6 +157,24 @@ function resetarTempoSessao() {
             "login.html";
 
     }, TEMPO_LIMITE);
+}
+
+async function iniciarControleSessao() {
+    const ultimaAtividade = Number(localStorage.getItem("ultima_atividade") || Date.now());
+
+    if (Date.now() - ultimaAtividade > TEMPO_LIMITE) {
+        await fazerLogout();
+        return false;
+    }
+
+    controleSessaoAtivo = true;
+    resetarTempoSessao();
+    return true;
+}
+
+function pararControleSessao() {
+    controleSessaoAtivo = false;
+    clearTimeout(tempoInatividade);
 }
 
 // eventos considerados interação
@@ -152,14 +193,13 @@ function resetarTempoSessao() {
     );
 });
 
-// inicia contador
-resetarTempoSessao();
-
 // =============================
 // LOGOUT
 // =============================
 async function fazerLogout() {
 
+    pararControleSessao();
+    localStorage.removeItem("ultima_atividade");
     await client.auth.signOut();
 
     window.location.href = 'login.html';
@@ -173,12 +213,48 @@ function irUpload() {
     window.location.href = "upload.html";
 }
 
+function irUploadPonto() {
+    window.location.href = "upload-ponto.html";
+}
+
+function irConfirmacoes() {
+    window.location.href = "confirmacoes.html";
+}
+
+function toggleMenuMobile() {
+    document.querySelector(".menu")?.classList.toggle("menu-aberto");
+}
+
+function mostrarSecaoUser(id) {
+    document.querySelectorAll(".secao-menu-user").forEach(secao => {
+        secao.hidden = secao.id !== id;
+    });
+
+    document.querySelector(".menu")?.classList.remove("menu-aberto");
+}
+
+function configurarComboAnosSolicitacao() {
+    const select = document.getElementById("solicitacao-ano");
+
+    if (!select || select.options.length > 0) return;
+
+    const anoAtual = new Date().getFullYear();
+
+    [anoAtual, anoAtual - 1].forEach(ano => {
+        const option = document.createElement("option");
+        option.value = String(ano);
+        option.textContent = String(ano);
+        select.appendChild(option);
+    });
+}
+
 // =============================
 // DASHBOARD USUÁRIO
 // =============================
 async function carregarDashboard(user) {
 
     const lista = document.getElementById('lista-arquivos');
+    const listaPonto = document.getElementById('lista-ponto');
     const loadingUser = document.getElementById('loading-user');
     const btn = document.getElementById('btn-refresh');
     const nomeSpan = document.getElementById("nome-usuario");
@@ -189,90 +265,48 @@ async function carregarDashboard(user) {
     }
 
     if (lista) lista.innerHTML = "";
+    if (listaPonto) listaPonto.innerHTML = "";
     if (loadingUser) loadingUser.style.display = "block";
     if (btn) btn.style.display = "none";
 
     try {
 
-        const nomeUsuario =
-            user.user_metadata?.full_name || "Colaborador";
+        const session = await client.auth.getSession();
+        const token = session.data.session?.access_token;
 
-        const nomeNormalizado =
-            normalizarTexto(nomeUsuario);
-
-        let arquivosEncontrados = [];
-
-        const { data: pastas, error } =
-            await client.storage
-                .from('contracheques')
-                .list('', { limit: 100 });
-
-        if (error) {
-
-            if (lista) {
-                lista.innerText = "Erro ao buscar arquivos.";
-            }
-
+        if (!token) {
+            window.location.href = "login.html";
             return;
         }
 
-        for (const pasta of pastas) {
+        const [resContracheques, resPonto] = await Promise.all([
+            fetch(`${API_URL}/documentos?tipo=contracheque`, {
+                headers: { Authorization: `Bearer ${token}` }
+            }),
+            fetch(`${API_URL}/documentos?tipo=folha-ponto`, {
+                headers: { Authorization: `Bearer ${token}` }
+            })
+        ]);
 
-            const { data: arquivos } =
-                await client.storage
-                    .from('contracheques')
-                    .list(pasta.name, { limit: 100 });
+        const contracheques = resContracheques.ok
+            ? await resContracheques.json()
+            : [];
 
-            if (!arquivos) continue;
+        const folhas = resPonto.ok
+            ? await resPonto.json()
+            : [];
 
-            arquivos.forEach(file => {
+        renderizarListaDocumentos(
+            lista,
+            contracheques,
+            "Nenhum contracheque disponível nos últimos 3 meses."
+        );
 
-                const nomeArquivo =
-                    normalizarTexto(file.name);
-
-                if (nomeArquivo.includes(nomeNormalizado)) {
-
-                    arquivosEncontrados.push({
-                        nome: file.name,
-                        caminho: `${pasta.name}/${file.name}`
-                    });
-                }
-            });
-        }
-
-        if (!lista) return;
-
-        if (arquivosEncontrados.length === 0) {
-
-            lista.innerText =
-                "Nenhum contracheque encontrado.";
-
-            return;
-        }
-
-        lista.innerHTML = "";
-
-        arquivosEncontrados.forEach(file => {
-
-            const div = document.createElement('div');
-            div.className = "documento";
-
-            const span = document.createElement('span');
-            span.innerText = file.nome;
-
-            const button = document.createElement('button');
-            button.className = "btn-download";
-            button.innerText = "Baixar";
-
-            button.addEventListener('click', () => {
-                baixarArquivo(file.caminho);
-            });
-
-            div.appendChild(span);
-            div.appendChild(button);
-
-            lista.appendChild(div);
-        });
+        renderizarListaDocumentos(
+            listaPonto,
+            folhas,
+            "Nenhuma folha de ponto disponível neste mês."
+        );
 
     } catch (err) {
 
@@ -292,6 +326,43 @@ async function carregarDashboard(user) {
             btn.style.display = "flex";
         }
     }
+}
+
+function renderizarListaDocumentos(container, documentos, mensagemVazia) {
+    if (!container) return;
+
+    container.innerHTML = "";
+
+    if (!documentos || documentos.length === 0) {
+        container.innerText = mensagemVazia;
+        return;
+    }
+
+    documentos.forEach(file => {
+        const div = document.createElement('div');
+        div.className = "documento";
+
+        const span = document.createElement('span');
+        span.innerText = file.nome;
+
+        const button = document.createElement('button');
+        button.className = "btn-download";
+        button.innerText = "Baixar";
+
+        button.addEventListener('click', () => {
+            if (file.tipo === "contracheque") {
+                baixarArquivo(file.caminho);
+                return;
+            }
+
+            baixarDocumentoDireto(file.bucket, file.caminho);
+        });
+
+        div.appendChild(span);
+        div.appendChild(button);
+
+        container.appendChild(div);
+    });
 }
 
 // =====================================
@@ -334,11 +405,44 @@ async function carregarDashboard(user) {
 
 async function abrirRecuperacaoSenha() {
 
-    const email = prompt(
-        "Digite seu e-mail cadastrado:"
-    );
+    const emailLogin = document.getElementById("email")?.value.trim() || "";
+    const modal = document.getElementById("modal-recuperacao");
+    const emailRecuperacao = document.getElementById("email-recuperacao");
+    const msg = document.getElementById("msg-recuperacao");
 
-    if (!email) return;
+    if (emailRecuperacao) {
+        emailRecuperacao.value = emailLogin.includes("@") ? emailLogin : "";
+    }
+
+    if (msg) {
+        msg.innerText = "";
+    }
+
+    if (modal) {
+        modal.style.display = "flex";
+    }
+}
+
+function fecharRecuperacaoSenha() {
+    const modal = document.getElementById("modal-recuperacao");
+
+    if (modal) {
+        modal.style.display = "none";
+    }
+}
+
+async function enviarRecuperacaoSenha() {
+
+    const email = document.getElementById("email-recuperacao")?.value.trim();
+    const msg = document.getElementById("msg-recuperacao");
+
+    if (!email) {
+        if (msg) {
+            msg.innerText = "Informe o e-mail cadastrado.";
+            msg.style.color = "red";
+        }
+        return;
+    }
 
     const {
         error
@@ -346,30 +450,37 @@ async function abrirRecuperacaoSenha() {
         email,
         {
             redirectTo:
-                "https://contracheques.onrender.com/reset-password.html"
+                `${window.location.origin}/reset-password.html`
         }
     );
 
     if (error) {
 
-        alert(
-            "Erro ao enviar e-mail."
-        );
+        if (msg) {
+            msg.innerText = "Erro ao enviar e-mail.";
+            msg.style.color = "red";
+        }
 
         console.error(error);
 
         return;
     }
 
-    alert(
-        "Link de recuperação enviado para seu e-mail."
-    );
+    if (msg) {
+        msg.innerText = "Link enviado. Verifique seu e-mail e a caixa de spam.";
+        msg.style.color = "green";
+    }
 }
 
 // =============================
 // ALTERAÇÃO NO ESQUECI A SENHA
 // =============================
 async function alterarSenha() {
+
+            const msg =
+                document.getElementById(
+                    "msg"
+                );
 
             const senha =
                 document.getElementById(
@@ -391,11 +502,6 @@ async function alterarSenha() {
 
                 return;
             }    
-
-            const msg =
-                document.getElementById(
-                    "msg"
-                );
 
             if (senha.length < 6) {
 
@@ -493,17 +599,34 @@ async function baixarArquivo(caminho) {
 }
 
 async function baixarArquivoConfirmado(caminho) {
+    return baixarDocumentoDireto("contracheques", caminho);
+}
 
-    const { data: arquivo, error } =
-        await client.storage
-            .from("contracheques")
-            .download(caminho);
+async function baixarDocumentoDireto(bucket, caminho) {
+    const session = await client.auth.getSession();
+    const token = session.data.session?.access_token;
 
-    if (error) {
-        alert("Erro ao baixar.");
+    if (!token) {
+        window.location.href = "login.html";
         return false;
     }
 
+    const res = await fetch(
+        `${API_URL}/download-documento?bucket=${encodeURIComponent(bucket)}&caminho=${encodeURIComponent(caminho)}`,
+        {
+            headers: {
+                Authorization: `Bearer ${token}`
+            }
+        }
+    );
+
+    if (!res.ok) {
+        const erro = await res.json().catch(() => ({}));
+        alert(erro?.erro || "Erro ao baixar.");
+        return false;
+    }
+
+    const arquivo = await res.blob();
     const url =
         URL.createObjectURL(arquivo);
 
@@ -618,10 +741,10 @@ function fecharModalTermos() {
 // =============================
 async function cadastrar() {
 
-    const nome = document.getElementById("nome")?.value.trim();
-    const email = document.getElementById("email")?.value.trim();
+    const nome = document.getElementById("nome")?.value.trim().toUpperCase();
+    const email = document.getElementById("email")?.value.trim().toLowerCase();
     const senha = document.getElementById("senha")?.value;
-    const cpf = document.getElementById("cpf")?.value.trim();
+    const cpf = document.getElementById("cpf")?.value.trim().replace(/\D/g, "");
     const tipo = document.getElementById("tipo").value;
 const msg = document.getElementById("msg");
 
@@ -988,7 +1111,13 @@ async function carregarConfirmacoes() {
             return;
         }
 
-        const res = await fetch(`${API_URL}/confirmacoes`, {
+        const paginaConfirmacoes = window.location.pathname
+            .toLowerCase()
+            .includes("confirmacoes");
+
+        const periodo = paginaConfirmacoes ? "" : "?periodo=recentes";
+
+        const res = await fetch(`${API_URL}/confirmacoes${periodo}`, {
             headers: {
                 Authorization: `Bearer ${token}`
             }
@@ -1339,6 +1468,333 @@ async function enviarPDF() {
     }
 }
 
+async function solicitarContrachequeAnterior() {
+    const ano = document.getElementById("solicitacao-ano")?.value;
+    const meses = Array
+        .from(document.querySelectorAll('input[name="solicitacao-mes"]:checked'))
+        .map(input => input.value);
+    const motivo = document.getElementById("solicitacao-motivo")?.value.trim();
+    const msg = document.getElementById("msg-solicitacao");
+
+    if (!ano || meses.length === 0) {
+        msg.innerText = "Selecione o ano e pelo menos um mês.";
+        msg.style.color = "red";
+        return;
+    }
+
+    const referencia = `${meses.join(", ")} / ${ano}`;
+
+    try {
+        const session = await client.auth.getSession();
+        const token = session.data.session?.access_token;
+
+        const res = await fetch(`${API_URL}/solicitacoes-contracheques`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${token}`
+            },
+            body: JSON.stringify({ referencia, motivo })
+        });
+
+        const data = await res.json().catch(() => ({}));
+
+        if (!res.ok) {
+            msg.innerText = data?.erro || "Erro ao solicitar.";
+            msg.style.color = "red";
+            return;
+        }
+
+        msg.innerText = "Solicitação enviada.";
+        msg.style.color = "green";
+        document
+            .querySelectorAll('input[name="solicitacao-mes"]:checked')
+            .forEach(input => {
+                input.checked = false;
+            });
+        document.getElementById("solicitacao-motivo").value = "";
+        carregarSolicitacoes();
+
+    } catch (err) {
+        console.error(err);
+        msg.innerText = "Erro inesperado.";
+        msg.style.color = "red";
+    }
+}
+
+async function carregarSolicitacoes() {
+    const listaUser = document.getElementById("lista-solicitacoes-user");
+    const listaAdmin = document.getElementById("lista-solicitacoes-admin");
+    const loadingAdmin = document.getElementById("loading-solicitacoes-admin");
+    const lista = listaAdmin || listaUser;
+
+    if (!lista) return;
+
+    lista.innerHTML = "";
+    if (loadingAdmin) loadingAdmin.style.display = "block";
+
+    try {
+        const session = await client.auth.getSession();
+        const token = session.data.session?.access_token;
+
+        const res = await fetch(`${API_URL}/solicitacoes-contracheques`, {
+            headers: { Authorization: `Bearer ${token}` }
+        });
+
+        if (!res.ok) throw new Error("Erro ao carregar solicitações");
+
+        const solicitacoes = await res.json();
+
+        if (!solicitacoes || solicitacoes.length === 0) {
+            lista.innerHTML = "<p>Nenhuma solicitação encontrada.</p>";
+            return;
+        }
+
+        solicitacoes.forEach(item => {
+            const div = document.createElement("div");
+            div.className = "confirmacao";
+
+            const info = document.createElement("div");
+            info.className = "confirmacao-info";
+
+            const titulo = document.createElement("strong");
+            titulo.textContent = listaAdmin
+                ? `${item.nome_usuario || "Sem nome"} - ${item.referencia || "Sem período"}`
+                : item.referencia || "Sem período";
+
+            const detalhe = document.createElement("span");
+            detalhe.textContent = item.motivo || "Sem motivo informado";
+
+            const status = document.createElement("small");
+            status.textContent = `Status: ${item.status || "pendente"}${
+                item.aprovado_por_nome ? ` por ${item.aprovado_por_nome}` : ""
+            }${
+                item.valido_ate ? ` | válido até ${formatarDataHora(item.valido_ate)}` : ""
+            }`;
+
+            info.appendChild(titulo);
+            info.appendChild(detalhe);
+            info.appendChild(status);
+            div.appendChild(info);
+
+            if (listaAdmin && item.status === "pendente") {
+                const actions = document.createElement("div");
+                actions.className = "actions";
+
+                const aprovar = document.createElement("button");
+                aprovar.className = "btn-password";
+                aprovar.textContent = "Aprovar";
+                aprovar.addEventListener("click", () => avaliarSolicitacao(item.id, "aprovado"));
+
+                const rejeitar = document.createElement("button");
+                rejeitar.className = "btn-delete";
+                rejeitar.textContent = "Rejeitar";
+                rejeitar.addEventListener("click", () => avaliarSolicitacao(item.id, "rejeitado"));
+
+                actions.appendChild(aprovar);
+                actions.appendChild(rejeitar);
+                div.appendChild(actions);
+            }
+
+            lista.appendChild(div);
+        });
+
+    } catch (err) {
+        console.error(err);
+        lista.innerHTML = "Erro ao carregar solicitações.";
+
+    } finally {
+        if (loadingAdmin) loadingAdmin.style.display = "none";
+    }
+}
+
+async function avaliarSolicitacao(id, status) {
+    const session = await client.auth.getSession();
+    const token = session.data.session?.access_token;
+
+    const res = await fetch(`${API_URL}/solicitacoes-contracheques/${id}`, {
+        method: "PUT",
+        headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({ status })
+    });
+
+    if (!res.ok) {
+        alert("Erro ao atualizar solicitação.");
+        return;
+    }
+
+    carregarSolicitacoes();
+}
+
+async function enviarAtestado() {
+    const input = document.getElementById("arquivo-atestado");
+    const file = input?.files[0];
+    const msg = document.getElementById("msg-atestado");
+
+    if (!file) {
+        msg.innerText = "Selecione um arquivo.";
+        msg.style.color = "red";
+        return;
+    }
+
+    try {
+        const session = await client.auth.getSession();
+        const token = session.data.session?.access_token;
+        const formData = new FormData();
+        formData.append("arquivo", file);
+
+        const res = await fetch(`${API_URL}/atestados`, {
+            method: "POST",
+            headers: {
+                Authorization: `Bearer ${token}`
+            },
+            body: formData
+        });
+
+        const data = await res.json().catch(() => ({}));
+
+        if (!res.ok) {
+            msg.innerText = data?.erro || "Erro ao enviar atestado.";
+            msg.style.color = "red";
+            return;
+        }
+
+        msg.innerText = data?.aviso || "Atestado enviado com sucesso.";
+        msg.style.color = data?.aviso ? "#92400e" : "green";
+        input.value = "";
+
+    } catch (err) {
+        console.error(err);
+        msg.innerText = "Erro inesperado.";
+        msg.style.color = "red";
+    }
+}
+
+async function carregarAtestadosAdmin() {
+    const lista = document.getElementById("lista-atestados-admin");
+    const loading = document.getElementById("loading-atestados-admin");
+
+    if (!lista) return;
+
+    lista.innerHTML = "";
+    if (loading) loading.style.display = "block";
+
+    try {
+        const session = await client.auth.getSession();
+        const token = session.data.session?.access_token;
+
+        const res = await fetch(`${API_URL}/atestados`, {
+            headers: { Authorization: `Bearer ${token}` }
+        });
+
+        if (!res.ok) throw new Error("Erro ao carregar atestados");
+
+        const atestados = await res.json();
+
+        if (!atestados || atestados.length === 0) {
+            lista.innerHTML = "<p>Nenhum atestado enviado.</p>";
+            return;
+        }
+
+        atestados.forEach(item => {
+            const div = document.createElement("div");
+            div.className = "confirmacao";
+
+            const info = document.createElement("div");
+            info.className = "confirmacao-info";
+
+            const nome = document.createElement("strong");
+            nome.textContent = item.nome_usuario || "Sem nome";
+
+            const arquivo = document.createElement("span");
+            arquivo.textContent = item.nome_arquivo || item.arquivo || "Arquivo";
+
+            const detalhe = document.createElement("small");
+            detalhe.textContent = `${formatarDataHora(item.created_at)} | ${item.status_email || "registrado"}`;
+
+            info.appendChild(nome);
+            info.appendChild(arquivo);
+            info.appendChild(detalhe);
+            div.appendChild(info);
+
+            lista.appendChild(div);
+        });
+
+    } catch (err) {
+        console.error(err);
+        lista.innerHTML = "Erro ao carregar atestados.";
+
+    } finally {
+        if (loading) loading.style.display = "none";
+    }
+}
+
+async function enviarPonto() {
+
+    if (enviandoArquivo) return;
+
+    enviandoArquivo = true;
+
+    const fileInput = document.getElementById("pdf");
+    const file = fileInput?.files[0];
+    const msg = document.getElementById("msg");
+    const loading = document.getElementById("loading");
+
+    try {
+        if (!file) {
+            msg.innerText = "Selecione um PDF.";
+            msg.style.color = "red";
+            return;
+        }
+
+        if (file.type !== "application/pdf") {
+            msg.innerText = "Envie apenas arquivos PDF.";
+            msg.style.color = "red";
+            return;
+        }
+
+        const formData = new FormData();
+        formData.append("pdf", file);
+
+        if (loading) loading.style.display = "block";
+        msg.innerText = "";
+
+        const session = await client.auth.getSession();
+        const token = session.data.session?.access_token;
+
+        const res = await fetch("/upload-ponto", {
+            method: "POST",
+            headers: {
+                Authorization: `Bearer ${token}`
+            },
+            body: formData
+        });
+
+        const data = await res.json();
+
+        if (res.ok) {
+            msg.innerText = "Folha de ponto enviada com sucesso.";
+            msg.style.color = "green";
+            fileInput.value = "";
+        } else {
+            msg.innerText = data?.erro || "Erro no upload.";
+            msg.style.color = "red";
+        }
+
+    } catch (err) {
+        console.error(err);
+        msg.innerText = "Erro ao conectar ao servidor.";
+        msg.style.color = "red";
+
+    } finally {
+        enviandoArquivo = false;
+        if (loading) loading.style.display = "none";
+    }
+}
+
 // =============================
 // INICIALIZAÇÃO SEGURA
 // =============================
@@ -1357,11 +1813,16 @@ document.addEventListener(
 
             // páginas públicas
             if (
-                pagina.includes("login")
+                pagina.includes("login") ||
+                pagina.includes("reset-password")
             ) {
 
                 document.body.style.display =
                     "";
+
+                if (pagina.includes("reset-password")) {
+                    await recuperarSessao();
+                }
 
                 return;
             }
@@ -1384,6 +1845,10 @@ document.addEventListener(
             const tipo =
                 user.user_metadata?.tipo;
 
+            const sessaoAtiva = await iniciarControleSessao();
+
+            if (!sessaoAtiva) return;
+
             // =============================
             // USER
             // =============================
@@ -1403,6 +1868,8 @@ document.addEventListener(
                 }
 
                 carregarDashboard(user);
+                configurarComboAnosSolicitacao();
+                carregarSolicitacoes();
             }
 
             // =============================
@@ -1424,6 +1891,8 @@ document.addEventListener(
                 carregarConfirmacoes();
                 carregarDashboard(user);
                 carregarContrachequesAdmin(user);
+                carregarSolicitacoes();
+                carregarAtestadosAdmin();
             }
 
             // =============================
@@ -1456,6 +1925,21 @@ document.addEventListener(
 
                     return;
                 }
+            }
+
+            if (
+                pagina.includes("confirmacoes")
+            ) {
+
+                if (tipo !== "admin") {
+
+                    window.location.href =
+                        "login.html";
+
+                    return;
+                }
+
+                carregarConfirmacoes();
             }
 
             // libera página

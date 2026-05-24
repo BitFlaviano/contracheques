@@ -7,8 +7,9 @@ const { PDFDocument } = require('pdf-lib');
 const pdfParse = require('pdf-parse');
 //const pdf = require('pdf-parse');
 //const pdfParse = require('pdf-parse/lib/pdf-parse');
-
 const path = require('path');
+
+
 
 const app = express();
 app.use(express.json());
@@ -122,29 +123,80 @@ function extrairMes(texto) {
     return "mes_desconhecido";
 }
 
-// =============================
-// FUNÇÃO: CADASTRO
-// =============================
-app.post('/register', async (req, res) => {
-    const { email, senha, nome, cpf, tipo } = req.body;
+function normalizarTexto(texto = "") {
+    return texto
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .toUpperCase()
+        .trim();
+}
 
-    const { error } = await supabaseAdmin.auth.admin.createUser({
-        email,
-        password: senha,
-        email_confirm: true,
-        user_metadata: { full_name: nome, cpf, tipo }
-    });
+function cpfLimpo(cpf = "") {
+    return String(cpf).replace(/\D/g, "");
+}
 
-    if (error) return res.status(400).json({ erro: error.message });
+function dataDaPasta(nomePasta = "") {
+    const match = String(nomePasta).match(/^(\d{4})(\d{2})(\d{2})/);
 
-    res.json({ sucesso: true });
+    if (!match) return null;
+
+    const data = new Date(
+        Number(match[1]),
+        Number(match[2]) - 1,
+        Number(match[3])
+    );
+
+    return Number.isNaN(data.getTime()) ? null : data;
+}
+
+function dentroDosUltimosMeses(data, meses) {
+    if (!data) return false;
+
+    const limite = new Date();
+    limite.setMonth(limite.getMonth() - meses);
+    limite.setHours(0, 0, 0, 0);
+
+    return data >= limite;
+}
+
+function mesmoMesAtual(data) {
+    if (!data) return false;
+
+    const hoje = new Date();
+
+    return data.getFullYear() === hoje.getFullYear() &&
+        data.getMonth() === hoje.getMonth();
+}
+
+function somarDias(data, dias) {
+    const resultado = new Date(data);
+    resultado.setDate(resultado.getDate() + dias);
+    return resultado;
+}
+
+async function garantirBuckets() {
+    const buckets = ['contracheques', 'folhas-ponto', 'atestados'];
+
+    for (const bucket of buckets) {
+        const { data } = await supabaseAdmin.storage.getBucket(bucket);
+
+        if (!data) {
+            await supabaseAdmin.storage.createBucket(bucket, {
+                public: false
+            });
+        }
+    }
+}
+
+garantirBuckets().catch(err => {
+    console.warn("Aviso ao verificar buckets:", err.message);
 });
 
-// =============================
-// FUNÇÃO: UPLOAD + PROCESSAMENTO
-// =============================
-app.post('/upload', upload.single('pdf'), async (req, res) => {
+async function processarPdfPorUsuario(req, res, bucket) {
     try {
+        const admin = await validarAdmin(req, res);
+        if (!admin) return;
+
         if (!req.file) {
             return res.status(400).json({ erro: "Arquivo não enviado" });
         }
@@ -166,35 +218,27 @@ app.post('/upload', upload.single('pdf'), async (req, res) => {
         let salvouAlgum = false;
 
         for (let i = 0; i < totalPaginas; i++) {
-
-            // cria PDF da página
             const novoPdf = await PDFDocument.create();
             const [pagina] = await novoPdf.copyPages(pdfDoc, [i]);
             novoPdf.addPage(pagina);
 
             const pdfBytes = await novoPdf.save();
-
-            // extrai texto da página
             const dadosPagina = await pdfParse(Buffer.from(pdfBytes));
-            //const dadosPagina = await pdfParse(Buffer.from(pdfBytes));
-            //const dadosPagina = await pdf(Buffer.from(pdfBytes));
             const textoPagina = dadosPagina.text;
 
             const nome = identificarUsuario(textoPagina, usuarios);
             const mes = extrairMes(textoPagina);
 
             if (!nome) {
-                console.log(`Página ${i+1} sem usuário identificado`);
+                console.log(`Página ${i + 1} sem usuário identificado`);
                 continue;
             }
 
-            // NOVO PADRÃO → COM ESPAÇO
             const nomeArquivo = `${nome} ${mes}.pdf`;
-
             const caminho = `${pastaUpload}/${nomeArquivo}`;
 
             const { error } = await supabaseAdmin.storage
-                .from('contracheques')
+                .from(bucket)
                 .upload(caminho, pdfBytes, {
                     contentType: 'application/pdf',
                     upsert: true
@@ -203,7 +247,7 @@ app.post('/upload', upload.single('pdf'), async (req, res) => {
             if (error) {
                 console.log("ERRO STORAGE:", error.message);
             } else {
-                console.log("SALVO:", caminho);
+                console.log("SALVO:", bucket, caminho);
                 salvouAlgum = true;
             }
         }
@@ -214,14 +258,545 @@ app.post('/upload', upload.single('pdf'), async (req, res) => {
             });
         }
 
-        res.json({
-            sucesso: true
-        });
+        res.json({ sucesso: true });
 
     } catch (err) {
         console.error("ERRO:", err);
         res.status(500).json({ erro: err.message });
     }
+}
+
+async function listarDocumentosUsuario(user, tipo) {
+    const bucket = tipo === 'folha-ponto' ? 'folhas-ponto' : 'contracheques';
+    const nomeNormalizado = normalizarTexto(user.user_metadata?.full_name || "");
+    const resultado = [];
+
+    const { data: pastas, error: erroPastas } = await supabaseAdmin.storage
+        .from(bucket)
+        .list('', { limit: 1000 });
+
+    if (erroPastas) throw erroPastas;
+
+    let liberarAntigos = false;
+
+    if (tipo === 'contracheque') {
+        const { data: solicitacoes } = await supabaseAdmin
+            .from('solicitacoes_contracheques')
+            .select('*')
+            .eq('user_id', user.id)
+            .eq('status', 'aprovado');
+
+        liberarAntigos = (solicitacoes || []).some(item => {
+            const validoAte = new Date(item.valido_ate || 0);
+            return validoAte >= new Date();
+        });
+    }
+
+    for (const pasta of pastas || []) {
+        const dataPasta = dataDaPasta(pasta.name);
+
+        const pastaPermitida = tipo === 'folha-ponto'
+            ? mesmoMesAtual(dataPasta)
+            : dentroDosUltimosMeses(dataPasta, 3) || liberarAntigos;
+
+        if (!pastaPermitida) continue;
+
+        const { data: arquivos } = await supabaseAdmin.storage
+            .from(bucket)
+            .list(pasta.name, { limit: 1000 });
+
+        for (const arquivo of arquivos || []) {
+            const nomeArquivo = normalizarTexto(arquivo.name);
+
+            if (!nomeArquivo.includes(nomeNormalizado)) continue;
+
+            resultado.push({
+                nome: arquivo.name,
+                caminho: `${pasta.name}/${arquivo.name}`,
+                tipo,
+                bucket,
+                data_upload: dataPasta?.toISOString() || null
+            });
+        }
+    }
+
+    return resultado.sort((a, b) =>
+        new Date(b.data_upload || 0) - new Date(a.data_upload || 0)
+    );
+}
+
+// =============================
+// FUNÇÃO: CADASTRO
+// =============================
+app.post('/register', async (req, res) => {
+    const { email, senha, nome, cpf, tipo } = req.body;
+
+    const { error } = await supabaseAdmin.auth.admin.createUser({
+        email,
+        password: senha,
+        email_confirm: true,
+        user_metadata: { full_name: nome, cpf, tipo }
+    });
+
+    if (error) return res.status(400).json({ erro: error.message });
+
+    res.json({ sucesso: true });
+});
+
+// =============================
+// FUNÇÃO: RESOLVER LOGIN POR EMAIL OU CPF
+// =============================
+app.post('/resolve-login', async (req, res) => {
+    try {
+        const { login } = req.body;
+
+        if (!login) {
+            return res.status(400).json({ erro: "Login não informado" });
+        }
+
+        if (String(login).includes("@")) {
+            return res.json({ email: String(login).trim() });
+        }
+
+        const cpf = cpfLimpo(login);
+
+        if (cpf.length !== 11) {
+            return res.status(400).json({ erro: "CPF inválido" });
+        }
+
+        const { data, error } = await supabaseAdmin.auth.admin.listUsers();
+
+        if (error) return res.status(400).json({ erro: error.message });
+
+        const usuario = data.users.find(user =>
+            cpfLimpo(user.user_metadata?.cpf || "") === cpf
+        );
+
+        if (!usuario?.email) {
+            return res.status(404).json({ erro: "CPF não encontrado" });
+        }
+
+        res.json({ email: usuario.email });
+
+    } catch (err) {
+        res.status(500).json({ erro: err.message });
+    }
+});
+
+// =============================
+// FUNÇÃO: LISTAR DOCUMENTOS DO USUÁRIO
+// =============================
+app.get('/documentos', async (req, res) => {
+    try {
+        const user = await validarUsuario(req, res);
+        if (!user) return;
+
+        const tipo = req.query.tipo === 'folha-ponto'
+            ? 'folha-ponto'
+            : 'contracheque';
+
+        const documentos = await listarDocumentosUsuario(user, tipo);
+
+        res.json(documentos);
+
+    } catch (err) {
+        res.status(500).json({ erro: err.message });
+    }
+});
+
+app.get('/download-documento', async (req, res) => {
+    try {
+        const user = await validarUsuario(req, res);
+        if (!user) return;
+
+        const bucket = req.query.bucket;
+        const caminho = req.query.caminho;
+
+        if (!['contracheques', 'folhas-ponto', 'atestados'].includes(bucket) || !caminho) {
+            return res.status(400).json({ erro: "Documento inválido" });
+        }
+
+        if (bucket === 'contracheques' || bucket === 'folhas-ponto') {
+            const tipo = bucket === 'folhas-ponto' ? 'folha-ponto' : 'contracheque';
+            const permitidos = await listarDocumentosUsuario(user, tipo);
+            const permitido = permitidos.some(doc =>
+                doc.bucket === bucket && doc.caminho === caminho
+            );
+
+            if (!permitido) {
+                return res.status(403).json({ erro: "Documento não liberado" });
+            }
+        }
+
+        if (bucket === 'atestados' && user.user_metadata?.tipo !== 'admin') {
+            return res.status(403).json({ erro: "Acesso negado" });
+        }
+
+        const { data, error } = await supabaseAdmin.storage
+            .from(bucket)
+            .download(caminho);
+
+        if (error) return res.status(400).json({ erro: error.message });
+
+        const arrayBuffer = await data.arrayBuffer();
+        const buffer = Buffer.from(arrayBuffer);
+
+        res.setHeader('Content-Type', data.type || 'application/octet-stream');
+        res.setHeader(
+            'Content-Disposition',
+            `attachment; filename="${encodeURIComponent(path.basename(caminho))}"`
+        );
+        res.send(buffer);
+
+    } catch (err) {
+        res.status(500).json({ erro: err.message });
+    }
+});
+
+// =============================
+// FUNÇÃO: SOLICITAÇÕES DE CONTRACHEQUES ANTIGOS
+// =============================
+app.post('/solicitacoes-contracheques', async (req, res) => {
+    try {
+        const user = await validarUsuario(req, res);
+        if (!user) return;
+
+        const { referencia, motivo } = req.body;
+
+        const { error } = await supabaseAdmin
+            .from('solicitacoes_contracheques')
+            .insert({
+                user_id: user.id,
+                nome_usuario: user.user_metadata?.full_name || "",
+                referencia: referencia || "",
+                motivo: motivo || "",
+                status: 'pendente'
+            });
+
+        if (error) return res.status(400).json({ erro: error.message });
+
+        res.json({ sucesso: true });
+
+    } catch (err) {
+        res.status(500).json({ erro: err.message });
+    }
+});
+
+app.get('/solicitacoes-contracheques', async (req, res) => {
+    try {
+        const user = await validarUsuario(req, res);
+        if (!user) return;
+
+        let query = supabaseAdmin
+            .from('solicitacoes_contracheques')
+            .select('*')
+            .order('created_at', { ascending: false });
+            
+
+        if (user.user_metadata?.tipo !== 'admin') {
+            query = query.eq('user_id', user.id);
+        }
+
+        const { data, error } = await query;
+
+        if (error) return res.status(400).json({ erro: error.message });
+
+        res.json(data || []);
+
+    } catch (err) {
+        res.status(500).json({ erro: err.message });
+    }
+});
+
+app.put('/solicitacoes-contracheques/:id', async (req, res) => {
+    try {
+        const admin = await validarAdmin(req, res);
+        if (!admin) return;
+
+        const { status } = req.body;
+
+        if (!['aprovado', 'rejeitado'].includes(status)) {
+            return res.status(400).json({ erro: "Status inválido" });
+        }
+
+        const atualizacao = {
+            status,
+            aprovado_por_id: admin.id,
+            aprovado_por_nome: admin.user_metadata?.full_name || admin.email || "Admin",
+            aprovado_em: new Date().toISOString(),
+            valido_ate: status === 'aprovado'
+                ? somarDias(new Date(), 15).toISOString()
+                : null
+        };
+
+        const { error } = await supabaseAdmin
+            .from('solicitacoes_contracheques')
+            .update(atualizacao)
+            .eq('id', req.params.id);
+
+        if (error) return res.status(400).json({ erro: error.message });
+
+        res.json({ sucesso: true });
+
+    } catch (err) {
+        res.status(500).json({ erro: err.message });
+    }
+});
+
+// =============================
+// FUNÇÃO: ATESTADOS
+// =============================
+app.post('/atestados', upload.single('arquivo'), async (req, res) => {
+
+    try {
+
+        const user = await validarUsuario(req, res);
+
+        if (!user) return;
+
+        if (!req.file) {
+            return res.status(400).json({
+                erro: "Arquivo não enviado"
+            });
+        }
+
+        const pasta =
+            `${user.id}/${gerarTimestamp()}`;
+
+        const nomeArquivo =
+            req.file.originalname || 'atestado.pdf';
+
+        const caminho =
+            `${pasta}/${nomeArquivo}`;
+
+        // =========================
+        // STORAGE
+        // =========================
+
+        const { error: erroUpload } =
+            await supabaseAdmin.storage
+                .from('atestados')
+                .upload(
+                    caminho,
+                    req.file.buffer,
+                    {
+                        contentType:
+                            req.file.mimetype ||
+                            'application/octet-stream',
+
+                        upsert: true
+                    }
+                );
+
+        if (erroUpload) {
+
+            return res.status(400).json({
+                erro: erroUpload.message
+            });
+        }
+
+        // =========================
+        // URL PÚBLICA
+        // =========================
+
+        const {
+            data: publicUrlData
+        } = supabaseAdmin.storage
+            .from('atestados')
+            .getPublicUrl(caminho);
+
+        const arquivoURL =
+            publicUrlData.publicUrl;
+
+        // =========================
+        // EMAIL
+        // =========================
+
+        let statusEmail = 'nao_enviado';
+
+        if (
+            process.env.SMTP_HOST &&
+            process.env.SMTP_USER &&
+            process.env.SMTP_PASS
+        ) {
+
+            try {
+
+                await transporter.sendMail({
+
+                    from:
+                        process.env.SMTP_USER,
+
+                    to:
+                        'financeiro@kidverte.com.br',
+
+                    subject:
+                        'Novo atestado enviado',
+
+                    html: `
+                        <h3>Novo atestado recebido</h3>
+
+                        <p>
+                            <strong>Funcionário:</strong>
+                            ${user.user_metadata?.full_name || ""}
+                        </p>
+
+                        <p>
+                            <strong>Email:</strong>
+                            ${user.email || ""}
+                        </p>
+
+                        <p>
+                            <a href="${arquivoURL}">
+                                Baixar atestado
+                            </a>
+                        </p>
+                    `
+                });
+
+                statusEmail = 'enviado';
+
+            } catch (emailErr) {
+
+                console.error(emailErr);
+
+                statusEmail = 'erro_envio';
+            }
+        }
+
+        // =========================
+        // BANCO
+        // =========================
+
+        const { error: erroInsert } =
+            await supabaseAdmin
+                .from('atestados')
+                .insert({
+
+                    user_id:
+                        user.id,
+
+                    nome_usuario:
+                        user.user_metadata?.full_name || "",
+
+                    email_usuario:
+                        user.email || "",
+
+                    arquivo:
+                        caminho,
+
+                    nome_arquivo:
+                        nomeArquivo,
+
+                    email_financeiro:
+                        'financeiro@kidverte.com.br',
+
+                    status_email:
+                        statusEmail
+                });
+
+        if (erroInsert) {
+
+            return res.status(400).json({
+                erro: erroInsert.message
+            });
+        }
+
+        res.json({
+            sucesso: true
+        });
+
+    } catch (err) {
+
+        console.error(err);
+
+        res.status(500).json({
+            erro: err.message
+        });
+    }
+});
+
+
+// // =============================
+// // FUNÇÃO: ATESTADOS
+// // =============================
+// app.post('/atestados', upload.single('arquivo'), async (req, res) => {
+//     try {
+//         const user = await validarUsuario(req, res);
+//         if (!user) return;
+
+//         if (!req.file) {
+//             return res.status(400).json({ erro: "Arquivo não enviado" });
+//         }
+
+//         const pasta = `${user.id}/${gerarTimestamp()}`;
+//         const nomeArquivo = req.file.originalname || 'atestado.pdf';
+//         const caminho = `${pasta}/${nomeArquivo}`;
+
+//         const { error: erroUpload } = await supabaseAdmin.storage
+//             .from('atestados')
+//             .upload(caminho, req.file.buffer, {
+//                 contentType: req.file.mimetype || 'application/octet-stream',
+//                 upsert: true
+//             });
+
+//         if (erroUpload) return res.status(400).json({ erro: erroUpload.message });
+
+//         const { error: erroInsert } = await supabaseAdmin
+//             .from('atestados')
+//             .insert({
+//                 user_id: user.id,
+//                 nome_usuario: user.user_metadata?.full_name || "",
+//                 email_usuario: user.email || "",
+//                 arquivo: caminho,
+//                 nome_arquivo: nomeArquivo,
+//                 email_financeiro: 'financeiro@kidverte.com',
+//                 status_email: process.env.SMTP_HOST ? 'pendente_envio' : 'smtp_nao_configurado'
+//             });
+
+//         if (erroInsert) return res.status(400).json({ erro: erroInsert.message });
+
+//         res.json({
+//             sucesso: true,
+//             aviso: process.env.SMTP_HOST
+//                 ? null
+//                 : "Atestado salvo. Configure SMTP_HOST/SMTP_USER/SMTP_PASS para envio automático ao financeiro."
+//         });
+
+//     } catch (err) {
+//         res.status(500).json({ erro: err.message });
+//     }
+// });
+
+app.get('/atestados', async (req, res) => {
+    try {
+        const admin = await validarAdmin(req, res);
+        if (!admin) return;
+
+        const { data, error } = await supabaseAdmin
+            .from('atestados')
+            .select('*')
+            .order('created_at', { ascending: false })
+            .limit(100);
+
+        if (error) return res.status(400).json({ erro: error.message });
+
+        res.json(data || []);
+
+    } catch (err) {
+        res.status(500).json({ erro: err.message });
+    }
+});
+
+// =============================
+// FUNÇÃO: UPLOAD + PROCESSAMENTO
+// =============================
+app.post('/upload', upload.single('pdf'), async (req, res) => {
+    await processarPdfPorUsuario(req, res, 'contracheques');
+});
+
+app.post('/upload-ponto', upload.single('pdf'), async (req, res) => {
+    await processarPdfPorUsuario(req, res, 'folhas-ponto');
 });
 
 // =============================
@@ -391,7 +966,7 @@ app.get('/confirmacoes', async (req, res) => {
             return dataB - dataA;
         });
 
-        const confirmacoes = [];
+        let confirmacoes = [];
         const vistos = new Set();
 
         for (const confirmacao of confirmacoesOrdenadas) {
@@ -401,6 +976,22 @@ app.get('/confirmacoes', async (req, res) => {
 
             vistos.add(chave);
             confirmacoes.push(confirmacao);
+        }
+
+        if (req.query.periodo === 'recentes') {
+            const limite = new Date();
+            limite.setDate(limite.getDate() - 30);
+
+            confirmacoes = confirmacoes.filter(confirmacao => {
+                const dataConfirmacao = new Date(
+                    confirmacao.created_at ||
+                    confirmacao.data ||
+                    confirmacao.data_confirmacao ||
+                    0
+                );
+
+                return dataConfirmacao >= limite;
+            });
         }
 
         res.json(confirmacoes);

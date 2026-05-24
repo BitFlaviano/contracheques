@@ -12,10 +12,10 @@
 <div class="box">
   <h2>Cadastro</h2>
 
-  <input type="text" id="nome" placeholder="Nome">
-  <input type="email" id="email" placeholder="Email">
+  <input type="text" id="nome" placeholder="Nome" oninput="this.value = this.value.toUpperCase()">
+  <input type="email" id="email" placeholder="Email" oninput="this.value = this.value.toLowerCase()">
   <input type="password" id="senha" placeholder="Senha">
-  <input type="text" id="cpf" placeholder="CPF (Apenas números)">
+  <input type="text" id="cpf" placeholder="CPF (Apenas números)" inputmode="numeric" oninput="this.value = this.value.replace(/\\D/g, '')">
 
   <select id="tipo">
     <option value="funcionario">Funcionário</option>
