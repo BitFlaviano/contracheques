@@ -985,14 +985,14 @@ app.post('/atestados', upload.single('arquivo'), async (req, res) => {
 
         } catch (emailErr) {
 
-            console.error(
-                "ERRO SMTP:",
-                emailErr
-            );
+    console.error(
+        "ERRO SMTP COMPLETO:"
+    );
 
-            statusEmail = 'erro_envio';
-        }
+    console.error(emailErr);
 
+    statusEmail = 'erro_envio';
+}
         // =============================
         // UPDATE STATUS EMAIL
         // =============================
