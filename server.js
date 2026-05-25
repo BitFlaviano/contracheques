@@ -755,76 +755,274 @@ app.put('/solicitacoes-contracheques/:id', async (req, res) => {
 // });
 
 
-// =============================
-// FUNÇÃO: ATESTADOS
-// =============================
+// // =============================
+// // FUNÇÃO: ATESTADOS
+// // =============================
+// app.post('/atestados', upload.single('arquivo'), async (req, res) => {
+//     try {
+//         const user = await validarUsuario(req, res);
+//         if (!user) return;
+
+//         if (!req.file) {
+//             return res.status(400).json({ erro: "Arquivo não enviado" });
+//         }
+
+//         const pasta = `${user.id}/${gerarTimestamp()}`;
+//         const nomeArquivo = req.file.originalname || 'atestado.pdf';
+//         const caminho = `${pasta}/${nomeArquivo}`;
+
+//         const { error: erroUpload } = await supabaseAdmin.storage
+//             .from('atestados')
+//             .upload(caminho, req.file.buffer, {
+//                 contentType: req.file.mimetype || 'application/octet-stream',
+//                 upsert: true
+//             });
+
+//         if (erroUpload) return res.status(400).json({ erro: erroUpload.message });
+
+//         const { error: erroInsert } = await supabaseAdmin
+//             .from('atestados')
+//             .insert({
+//                 user_id: user.id,
+//                 nome_usuario: user.user_metadata?.full_name || "",
+//                 email_usuario: user.email || "",
+//                 arquivo: caminho,
+//                 nome_arquivo: nomeArquivo,
+//                 email_financeiro: 'financeiro@kidverte.com.br',
+//                 status_email: process.env.SMTP_HOST ? 'pendente_envio' : 'smtp_nao_configurado'
+//             });
+
+//         if (erroInsert) return res.status(400).json({ erro: erroInsert.message });
+
+//         res.json({
+//             sucesso: true,
+//             aviso: process.env.SMTP_HOST
+//                 ? null
+//                 : "Atestado salvo. Configure SMTP_HOST/SMTP_USER/SMTP_PASS para envio automático ao financeiro."
+//         });
+
+//     } catch (err) {
+//         res.status(500).json({ erro: err.message });
+//     }
+// });
+
+// app.get('/atestados', async (req, res) => {
+//     try {
+//         const admin = await validarAdmin(req, res);
+//         if (!admin) return;
+
+//         const { data, error } = await supabaseAdmin
+//             .from('atestados')
+//             .select('*')
+//             .order('criado_em', { ascending: false })
+//             .limit(100);
+
+//         if (error) return res.status(400).json({ erro: error.message });
+
+//         res.json(data || []);
+
+//     } catch (err) {
+//         res.status(500).json({ erro: err.message });
+//     }
+// });
+
 app.post('/atestados', upload.single('arquivo'), async (req, res) => {
+
     try {
-        const user = await validarUsuario(req, res);
+
+        const user =
+            await validarUsuario(req, res);
+
         if (!user) return;
 
         if (!req.file) {
-            return res.status(400).json({ erro: "Arquivo não enviado" });
+
+            return res.status(400).json({
+                erro: "Arquivo não enviado"
+            });
         }
 
-        const pasta = `${user.id}/${gerarTimestamp()}`;
-        const nomeArquivo = req.file.originalname || 'atestado.pdf';
-        const caminho = `${pasta}/${nomeArquivo}`;
+        const pasta =
+            `${user.id}/${gerarTimestamp()}`;
 
-        const { error: erroUpload } = await supabaseAdmin.storage
-            .from('atestados')
-            .upload(caminho, req.file.buffer, {
-                contentType: req.file.mimetype || 'application/octet-stream',
-                upsert: true
+        const nomeArquivo =
+            req.file.originalname || 'atestado.pdf';
+
+        const caminho =
+            `${pasta}/${nomeArquivo}`;
+
+        // =============================
+        // UPLOAD STORAGE
+        // =============================
+
+        const { error: erroUpload } =
+            await supabaseAdmin.storage
+                .from('atestados')
+                .upload(
+                    caminho,
+                    req.file.buffer,
+                    {
+                        contentType:
+                            req.file.mimetype ||
+                            'application/octet-stream',
+
+                        upsert: true
+                    }
+                );
+
+        if (erroUpload) {
+
+            return res.status(400).json({
+                erro: erroUpload.message
             });
+        }
 
-        if (erroUpload) return res.status(400).json({ erro: erroUpload.message });
+        // =============================
+        // INSERT BANCO
+        // =============================
 
-        const { error: erroInsert } = await supabaseAdmin
+        const {
+            data: atestado,
+            error: erroInsert
+        } = await supabaseAdmin
             .from('atestados')
             .insert({
-                user_id: user.id,
-                nome_usuario: user.user_metadata?.full_name || "",
-                email_usuario: user.email || "",
-                arquivo: caminho,
-                nome_arquivo: nomeArquivo,
-                email_financeiro: 'financeiro@kidverte.com.br',
-                status_email: process.env.SMTP_HOST ? 'pendente_envio' : 'smtp_nao_configurado'
+
+                user_id:
+                    user.id,
+
+                nome_usuario:
+                    user.user_metadata?.full_name || "",
+
+                email_usuario:
+                    user.email || "",
+
+                arquivo:
+                    caminho,
+
+                nome_arquivo:
+                    nomeArquivo,
+
+                email_financeiro:
+                    'financeiro@kidverte.com.br',
+
+                status_email:
+                    'pendente_envio'
+            })
+            .select()
+            .single();
+
+        if (erroInsert) {
+
+            return res.status(400).json({
+                erro: erroInsert.message
+            });
+        }
+
+        // =============================
+        // ENVIO EMAIL
+        // =============================
+
+        let statusEmail = 'pendente_envio';
+
+        try {
+
+            const transporter =
+                nodemailer.createTransport({
+
+                    host:
+                        process.env.SMTP_HOST,
+
+                    port:
+                        Number(process.env.SMTP_PORT),
+
+                    secure: true,
+
+                    auth: {
+                        user:
+                            process.env.SMTP_USER,
+
+                        pass:
+                            process.env.SMTP_PASS
+                    }
+                });
+
+            await transporter.sendMail({
+
+                from:
+                    `"Portal Kidverte" <${process.env.SMTP_USER}>`,
+
+                to:
+                    'financeiro@kidverte.com.br',
+
+                replyTo:
+                    user.email,
+
+                subject:
+                    'Novo atestado enviado',
+
+                html: `
+                    <h3>Novo atestado recebido</h3>
+
+                    <p>
+                        <strong>Funcionário:</strong>
+                        ${user.user_metadata?.full_name}
+                    </p>
+
+                    <p>
+                        <strong>Email:</strong>
+                        ${user.email}
+                    </p>
+
+                    <p>
+                        <strong>Arquivo:</strong>
+                        ${nomeArquivo}
+                    </p>
+                `
             });
 
-        if (erroInsert) return res.status(400).json({ erro: erroInsert.message });
+            statusEmail = 'enviado';
+
+        } catch (emailErr) {
+
+            console.error(
+                "ERRO SMTP:",
+                emailErr
+            );
+
+            statusEmail = 'erro_envio';
+        }
+
+        // =============================
+        // UPDATE STATUS EMAIL
+        // =============================
+
+        await supabaseAdmin
+            .from('atestados')
+            .update({
+                status_email:
+                    statusEmail
+            })
+            .eq('id', atestado.id);
+
+        // =============================
+        // RESPOSTA
+        // =============================
 
         res.json({
-            sucesso: true,
-            aviso: process.env.SMTP_HOST
-                ? null
-                : "Atestado salvo. Configure SMTP_HOST/SMTP_USER/SMTP_PASS para envio automático ao financeiro."
+            sucesso: true
         });
 
     } catch (err) {
-        res.status(500).json({ erro: err.message });
+
+        console.error(err);
+
+        res.status(500).json({
+            erro: err.message
+        });
     }
 });
 
-app.get('/atestados', async (req, res) => {
-    try {
-        const admin = await validarAdmin(req, res);
-        if (!admin) return;
-
-        const { data, error } = await supabaseAdmin
-            .from('atestados')
-            .select('*')
-            .order('criado_em', { ascending: false })
-            .limit(100);
-
-        if (error) return res.status(400).json({ erro: error.message });
-
-        res.json(data || []);
-
-    } catch (err) {
-        res.status(500).json({ erro: err.message });
-    }
-});
 
 // =============================
 // FUNÇÃO: UPLOAD + PROCESSAMENTO
