@@ -826,7 +826,7 @@ app.get('/atestados', async (req, res) => {
                 .from('atestados')
                 .select('*')
                 .order(
-                    'created_at',
+                    'criado_em',
                     { ascending: false }
                 )
                 .limit(100);
@@ -1286,7 +1286,7 @@ app.get('/confirmacoes', async (req, res) => {
 
             confirmacoes = confirmacoes.filter(confirmacao => {
                 const dataConfirmacao = new Date(
-                    confirmacao.created_at ||
+                    confirmacao.criado_em ||
                     confirmacao.data ||
                     confirmacao.data_confirmacao ||
                     0
