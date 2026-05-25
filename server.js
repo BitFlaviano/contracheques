@@ -806,25 +806,25 @@ app.put('/solicitacoes-contracheques/:id', async (req, res) => {
 //     }
 // });
 
-// app.get('/atestados', async (req, res) => {
-//     try {
-//         const admin = await validarAdmin(req, res);
-//         if (!admin) return;
+app.get('/atestados', async (req, res) => {
+    try {
+        const admin = await validarAdmin(req, res);
+        if (!admin) return;
 
-//         const { data, error } = await supabaseAdmin
-//             .from('atestados')
-//             .select('*')
-//             .order('criado_em', { ascending: false })
-//             .limit(100);
+        const { data, error } = await supabaseAdmin
+            .from('atestados')
+            .select('*')
+            .order('criado_em', { ascending: false })
+            .limit(100);
 
-//         if (error) return res.status(400).json({ erro: error.message });
+        if (error) return res.status(400).json({ erro: error.message });
 
-//         res.json(data || []);
+        res.json(data || []);
 
-//     } catch (err) {
-//         res.status(500).json({ erro: err.message });
-//     }
-// });
+    } catch (err) {
+        res.status(500).json({ erro: err.message });
+    }
+});
 
 app.post('/atestados', upload.single('arquivo'), async (req, res) => {
 
