@@ -8,7 +8,7 @@ const pdfParse = require('pdf-parse');
 //const pdf = require('pdf-parse');
 //const pdfParse = require('pdf-parse/lib/pdf-parse');
 const path = require('path');
-
+const nodemailer = require('nodemailer');
 
 
 const app = express();
@@ -1029,8 +1029,60 @@ app.post('/atestados', upload.single('arquivo'), async (req, res) => {
             erro: err.message
         });
     }
+
+    await transporter.sendMail({
+
+        from:
+            `"Portal Kidverte" <${process.env.SMTP_USER}>`,
+
+        to:
+            'financeiro@kidverte.com.br',
+
+        replyTo:
+            user.email,
+
+        subject:
+            'Novo atestado enviado',
+
+        html: `
+                <h3>Novo atestado recebido</h3>
+
+                <p>
+                    <strong>Funcionário:</strong>
+                    ${user.user_metadata?.full_name}
+                </p>
+
+                <p>
+                    <strong>Email:</strong>
+                    ${user.email}
+                </p>
+
+                <p>
+                    <strong>Arquivo:</strong>
+                    ${nomeArquivo}
+                </p>
+            `
+    });
+
 });
 
+const transporter = nodemailer.createTransport({
+
+    host: process.env.SMTP_HOST,
+
+    port: Number(process.env.SMTP_PORT),
+
+    secure: true,
+
+    auth: {
+        user: process.env.SMTP_USER,
+        pass: process.env.SMTP_PASS
+    },
+
+    tls: {
+        rejectUnauthorized: false
+    }
+});
 
 // =============================
 // FUNÇÃO: UPLOAD + PROCESSAMENTO
