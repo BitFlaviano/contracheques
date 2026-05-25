@@ -1023,15 +1023,42 @@ app.post(
 
             } catch (emailErr) {
 
-                console.error(
-                    'ERRO SMTP COMPLETO:'
-                );
+    console.error(
+        "================ SMTP ERROR ================"
+    );
 
-                console.error(emailErr);
+    console.error(
+        "MESSAGE:",
+        emailErr.message
+    );
 
-                statusEmail =
-                    'erro_envio';
-            }
+    console.error(
+        "CODE:",
+        emailErr.code
+    );
+
+    console.error(
+        "COMMAND:",
+        emailErr.command
+    );
+
+    console.error(
+        "RESPONSE:",
+        emailErr.response
+    );
+
+    console.error(
+        "FULL ERROR:"
+    );
+
+    console.error(emailErr);
+
+    console.error(
+        "============================================"
+    );
+
+    statusEmail = 'erro_envio';
+}
 
             // =============================
             // UPDATE STATUS
