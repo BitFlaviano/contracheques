@@ -1003,7 +1003,15 @@ app.post('/atestados', upload.single('arquivo'), async (req, res) => {
                 status_email:
                     statusEmail
             })
-            .eq('id', atestado.id);
+            if (atestado?.id) {
+
+        await supabaseAdmin
+        .from('atestados')
+        .update({
+            status_email: statusEmail
+        })
+        .eq('id', atestado.id);
+}
 
         // =============================
         // RESPOSTA
