@@ -881,12 +881,12 @@ app.post('/atestados', upload.single('arquivo'), async (req, res) => {
         // INSERT BANCO
         // =============================
 
-        const {
-            data: atestado,
-            error: erroInsert
-        } = await supabaseAdmin
-            .from('atestados')
-            .insert({
+            const {
+                data: atestadoData,
+                error: erroInsert
+            } = await supabaseAdmin
+                .from('atestados')
+                .insert({
 
                 user_id:
                     user.id,
@@ -909,8 +909,8 @@ app.post('/atestados', upload.single('arquivo'), async (req, res) => {
                 status_email:
                     'pendente_envio'
             })
-            .select()
-            .single();
+            .select();
+            const atestado = atestadoData?.[0];
 
         if (erroInsert) {
 
