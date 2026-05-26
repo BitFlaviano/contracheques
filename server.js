@@ -1369,6 +1369,138 @@ app.get('/confirmacoes', async (req, res) => {
     }
 });
 
+// =============================
+// FUNÇÃO: REGISTRAR CONFIRMAÇÃO PONTO
+// =============================
+app.post('/confirmacoes-ponto', async (req, res) => {
+    try {
+        const user = await validarUsuario(req, res);
+        if (!user) return;
+
+        const { arquivo } = req.body;
+
+        if (!arquivo) {
+            return res.status(400).json({ erro: "Arquivo não informado" });
+        }
+
+        const { data: existente, error: erroBusca } = await supabaseAdmin
+            .from('confirmacoes_ponto')
+            .select('*')
+            .eq('user_id', user.id)
+            .eq('arquivo', arquivo)
+            .limit(1);
+
+        if (erroBusca) return res.status(400).json({ erro: erroBusca.message });
+
+        if (existente && existente.length > 0) {
+            return res.json({ sucesso: true, existente: true });
+        }
+
+        const { error: erroInsert } = await supabaseAdmin
+            .from('confirmacoes_ponto')
+            .insert({
+                user_id: user.id,
+                nome_usuario: user.user_metadata?.full_name || "",
+                arquivo,
+                confirmado: true
+            });
+
+        if (erroInsert) return res.status(400).json({ erro: erroInsert.message });
+
+        res.json({ sucesso: true, existente: false });
+
+    } catch (err) {
+        res.status(500).json({ erro: err.message });
+    }
+});
+
+// =============================
+// FUNÇÃO: VERIFICAR CONFIRMAÇÃO PONTO
+// =============================
+app.get('/confirmacoes-ponto/status', async (req, res) => {
+    try {
+        const user = await validarUsuario(req, res);
+        if (!user) return;
+
+        const arquivo = req.query.arquivo;
+
+        if (!arquivo) {
+            return res.status(400).json({ erro: "Arquivo não informado" });
+        }
+
+        const { data, error } = await supabaseAdmin
+            .from('confirmacoes_ponto')
+            .select('*')
+            .eq('user_id', user.id)
+            .eq('arquivo', arquivo)
+            .limit(1);
+
+        if (error) return res.status(400).json({ erro: error.message });
+
+        res.json({ confirmado: !!(data && data.length > 0) });
+
+    } catch (err) {
+        res.status(500).json({ erro: err.message });
+    }
+});
+
+// =============================
+// FUNÇÃO: LISTAR CONFIRMAÇÕES PONTO
+// =============================
+app.get('/confirmacoes-ponto', async (req, res) => {
+    try {
+        const admin = await validarAdmin(req, res);
+        if (!admin) return;
+
+        const { data, error } = await supabaseAdmin
+            .from('confirmacoes_ponto')
+            .select('*')
+            .limit(100);
+
+        if (error) return res.status(400).json({ erro: error.message });
+
+        const confirmacoesOrdenadas = (data || []).sort((a, b) => {
+            const dataA = new Date(a.criado_em || a.data || a.data_confirmacao || 0).getTime();
+            const dataB = new Date(b.criado_em || b.data || b.data_confirmacao || 0).getTime();
+
+            return dataB - dataA;
+        });
+
+        let confirmacoes = [];
+        const vistos = new Set();
+
+        for (const confirmacao of confirmacoesOrdenadas) {
+            const chave = `${confirmacao.user_id || ""}::${confirmacao.arquivo || ""}`;
+
+            if (vistos.has(chave)) continue;
+
+            vistos.add(chave);
+            confirmacoes.push(confirmacao);
+        }
+
+        if (req.query.periodo === 'recentes') {
+            const limite = new Date();
+            limite.setDate(limite.getDate() - 30);
+
+            confirmacoes = confirmacoes.filter(confirmacao => {
+                const dataConfirmacao = new Date(
+                    confirmacao.criado_em ||
+                    confirmacao.data ||
+                    confirmacao.data_confirmacao ||
+                    0
+                );
+
+                return dataConfirmacao >= limite;
+            });
+        }
+
+        res.json(confirmacoes);
+
+    } catch (err) {
+        res.status(500).json({ erro: err.message });
+    }
+});
+
 app.use(cors());
 app.use(express.static('public'));
 // =============================

@@ -37,6 +37,21 @@ create table if not exists public.atestados (
 create index if not exists idx_atestados_user_id
   on public.atestados (user_id);
 
+create table if not exists public.confirmacoes_ponto (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null,
+  nome_usuario text,
+  arquivo text not null,
+  confirmado boolean not null default true,
+  criado_em timestamptz not null default now()
+);
+
+create index if not exists idx_confirmacoes_ponto_user_id
+  on public.confirmacoes_ponto (user_id);
+
+create index if not exists idx_confirmacoes_ponto_arquivo
+  on public.confirmacoes_ponto (arquivo);
+
 insert into storage.buckets (id, name, public)
 values
   ('folhas-ponto', 'folhas-ponto', false),

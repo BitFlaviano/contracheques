@@ -16,6 +16,7 @@ let fazendoLogin = false;
 let enviandoArquivo = false;
 let arquivoPendente = null;
 let confirmandoDownload = false;
+let tipoPendente = null;
 
 
 // =============================
@@ -355,6 +356,11 @@ function renderizarListaDocumentos(container, documentos, mensagemVazia) {
                 return;
             }
 
+            if (file.tipo === "folha-ponto") {
+                baixarFolhaPonto(file.caminho);
+                return;
+            }
+
             baixarDocumentoDireto(file.bucket, file.caminho);
         });
 
@@ -581,6 +587,7 @@ async function baixarArquivo(caminho) {
         }
 
         arquivoPendente = caminho;
+        tipoPendente = "contracheque";
 
         const modal =
             document.getElementById(
@@ -600,6 +607,60 @@ async function baixarArquivo(caminho) {
 
 async function baixarArquivoConfirmado(caminho) {
     return baixarDocumentoDireto("contracheques", caminho);
+}
+
+// =============================
+// BAIXAR FOLHA DE PONTO (COM CONFIRMAÇÃO)
+// =============================
+async function baixarFolhaPonto(caminho) {
+
+    try {
+
+        const session = await client.auth.getSession();
+        const token = session.data.session?.access_token;
+
+        if (!token) {
+            window.location.href = "login.html";
+            return;
+        }
+
+        const res = await fetch(
+            `${API_URL}/confirmacoes-ponto/status?arquivo=${encodeURIComponent(caminho)}`,
+            {
+                headers: {
+                    Authorization: `Bearer ${token}`
+                }
+            }
+        );
+
+        if (!res.ok) {
+            throw new Error("Erro ao verificar confirmação.");
+        }
+
+        const data = await res.json();
+
+        if (data.confirmado) {
+            await baixarDocumentoDireto("folhas-ponto", caminho);
+            return;
+        }
+
+        arquivoPendente = caminho;
+        tipoPendente = "folha-ponto";
+
+        const modal =
+            document.getElementById(
+                "modal-termos"
+            );
+
+        if (modal) {
+            modal.style.display = "flex";
+        }
+
+    } catch (err) {
+
+        console.error(err);
+        alert("Erro ao verificar confirmação do documento.");
+    }
 }
 
 async function baixarDocumentoDireto(bucket, caminho) {
@@ -681,7 +742,11 @@ async function confirmarDownload() {
 
     try {
 
-        const resConfirmacao = await fetch(`${API_URL}/confirmacoes`, {
+        const endpointConfirmacao = tipoPendente === "folha-ponto"
+            ? `${API_URL}/confirmacoes-ponto`
+            : `${API_URL}/confirmacoes`;
+
+        const resConfirmacao = await fetch(endpointConfirmacao, {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",
@@ -698,7 +763,11 @@ async function confirmarDownload() {
             return;
         }
 
-        const baixou = await baixarArquivoConfirmado(arquivoPendente);
+        const bucketDownload = tipoPendente === "folha-ponto"
+            ? "folhas-ponto"
+            : "contracheques";
+
+        const baixou = await baixarDocumentoDireto(bucketDownload, arquivoPendente);
 
         if (!baixou) return;
 
@@ -709,6 +778,7 @@ async function confirmarDownload() {
 
         checkbox.checked = false;
         arquivoPendente = null;
+        tipoPendente = null;
 
         if (typeof carregarConfirmacoes === "function") {
             carregarConfirmacoes();
@@ -733,6 +803,7 @@ function fecharModalTermos() {
     }
 
     arquivoPendente = null;
+    tipoPendente = null;
     confirmandoDownload = false;
 }
 
@@ -1117,17 +1188,27 @@ async function carregarConfirmacoes() {
 
         const periodo = paginaConfirmacoes ? "" : "?periodo=recentes";
 
-        const res = await fetch(`${API_URL}/confirmacoes${periodo}`, {
-            headers: {
-                Authorization: `Bearer ${token}`
-            }
-        });
+        const [resContracheque, resPonto] = await Promise.all([
+            fetch(`${API_URL}/confirmacoes${periodo}`, {
+                headers: { Authorization: `Bearer ${token}` }
+            }),
+            fetch(`${API_URL}/confirmacoes-ponto${periodo}`, {
+                headers: { Authorization: `Bearer ${token}` }
+            })
+        ]);
 
-        if (!res.ok) {
+        if (!resContracheque.ok || !resPonto.ok) {
             throw new Error("Erro ao carregar confirmações");
         }
 
-        const confirmacoes = await res.json();
+        const confContracheque = (await resContracheque.json()).map(c => ({ ...c, tipo_doc: "Contracheque" }));
+        const confPonto = (await resPonto.json()).map(c => ({ ...c, tipo_doc: "Folha de Ponto" }));
+
+        const confirmacoes = [...confContracheque, ...confPonto].sort((a, b) => {
+            const dataA = new Date(a.criado_em || a.data || a.data_confirmacao || a.created_at || 0).getTime();
+            const dataB = new Date(b.criado_em || b.data || b.data_confirmacao || b.created_at || 0).getTime();
+            return dataB - dataA;
+        });
 
         if (!confirmacoes || confirmacoes.length === 0) {
             lista.innerHTML = "<p>Nenhuma confirmação encontrada.</p>";
@@ -1157,7 +1238,12 @@ async function carregarConfirmacoes() {
                 confirmacao.data_confirmacao
             );
 
+            const tipoDoc = document.createElement("small");
+            tipoDoc.textContent = confirmacao.tipo_doc || "Contracheque";
+            tipoDoc.style.color = "#666";
+
             info.appendChild(nome);
+            info.appendChild(tipoDoc);
             info.appendChild(arquivo);
             info.appendChild(data);
 
