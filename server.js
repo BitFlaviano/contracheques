@@ -45,7 +45,13 @@ async function enviarEmail({ from, to, replyTo, subject, html, attachments }) {
             content: a.content  // Buffer
         }));
     }
-    return await resend.emails.send(payload);
+    const { data, error } = await resend.emails.send(payload);
+    if (error) {
+        const err = new Error(error.message || 'Erro ao enviar email via Resend');
+        err.resendError = error;
+        throw err;
+    }
+    return data;
 }
 
 async function validarAdmin(req, res) {
@@ -329,17 +335,17 @@ async function processarPdfPorUsuario(req, res, bucket) {
                 statusEmail = 'enviado';
 
             } catch (emailErr) {
-                console.error("================ SMTP ERROR ================");
+                console.error("================ RESEND ERROR ================");
                 console.error("MESSAGE:", emailErr.message);
-                console.error("CODE:", emailErr.code);
-                console.error("COMMAND:", emailErr.command);
-                console.error("RESPONSE:", emailErr.response);
+                if (emailErr.resendError) {
+                    console.error("RESEND DETAILS:", JSON.stringify(emailErr.resendError, null, 2));
+                }
                 console.error("FULL ERROR:", emailErr);
-                console.error("============================================");
+                console.error("===============================================");
                 statusEmail = 'erro_envio';
             }
         } else {
-            console.warn("SMTP não configurado — email de contracheques NÃO enviado. Defina SMTP_HOST, SMTP_USER e SMTP_PASS no .env");
+            console.warn("RESEND_API_KEY não configurado — email de contracheques NÃO enviado. Defina RESEND_API_KEY no ambiente.");
         }
 
         res.json({ sucesso: true, status_email: statusEmail });
@@ -1081,7 +1087,7 @@ app.post(
             } catch (emailErr) {
 
     console.error(
-        "================ SMTP ERROR ================"
+        "================ RESEND ERROR ================"
     );
 
     console.error(
@@ -1089,20 +1095,12 @@ app.post(
         emailErr.message
     );
 
-    console.error(
-        "CODE:",
-        emailErr.code
-    );
-
-    console.error(
-        "COMMAND:",
-        emailErr.command
-    );
-
-    console.error(
-        "RESPONSE:",
-        emailErr.response
-    );
+    if (emailErr.resendError) {
+        console.error(
+            "RESEND DETAILS:",
+            JSON.stringify(emailErr.resendError, null, 2)
+        );
+    }
 
     console.error(
         "FULL ERROR:"
@@ -1111,7 +1109,7 @@ app.post(
     console.error(emailErr);
 
     console.error(
-        "============================================"
+        "==============================================="
     );
 
     statusEmail = 'erro_envio';
