@@ -196,7 +196,7 @@ function somarDias(data, dias) {
 }
 
 async function garantirBuckets() {
-    const buckets = ['contracheques', 'folhas-ponto', 'atestados'];
+    const buckets = ['contracheques', 'folhas-ponto', 'atestados', 'comprovantes'];
 
     for (const bucket of buckets) {
         const { data } = await supabaseAdmin.storage.getBucket(bucket);
@@ -351,7 +351,17 @@ async function processarPdfPorUsuario(req, res, bucket) {
 }
 
 async function listarDocumentosUsuario(user, tipo) {
-    const bucket = tipo === 'folha-ponto' ? 'folhas-ponto' : 'contracheques';
+    //const bucket = tipo === 'folha-ponto' ? 'folhas-ponto' : 'contracheques';
+    let bucket = 'contracheques';
+
+    if (tipo === 'folha-ponto') {
+        bucket = 'folhas-ponto';
+    }
+
+    if (tipo === 'comprovante') {
+        bucket = 'comprovantes';
+    }
+
     const nomeNormalizado = normalizarTexto(user.user_metadata?.full_name || "");
     const resultado = [];
 
@@ -408,6 +418,22 @@ async function listarDocumentosUsuario(user, tipo) {
         new Date(b.data_upload || 0) - new Date(a.data_upload || 0)
     );
 }
+//=============================
+// FUNCAO: COMPROVANTES
+//=============================
+
+app.post(
+    '/upload-comprovantes',
+    upload.single('pdf'),
+    async (req, res) => {
+
+        await processarPdfPorUsuario(
+            req,
+            res,
+            'comprovantes'
+        );
+    }
+);
 
 // =============================
 // FUNÇÃO: CADASTRO
@@ -475,10 +501,15 @@ app.get('/documentos', async (req, res) => {
         const user = await validarUsuario(req, res);
         if (!user) return;
 
-        const tipo = req.query.tipo === 'folha-ponto'
-            ? 'folha-ponto'
-            : 'contracheque';
+        let tipo = 'contracheque';
 
+        if (req.query.tipo === 'folha-ponto') {
+            tipo = 'folha-ponto';
+        }
+
+        if (req.query.tipo === 'comprovante') {
+            tipo = 'comprovante';
+        }
         const documentos = await listarDocumentosUsuario(user, tipo);
 
         res.json(documentos);
