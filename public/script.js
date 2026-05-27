@@ -204,6 +204,9 @@ async function fazerLogout() {
 
     window.location.href = 'login.html';
 }
+function irUploadComprovantes() {
+    window.location.href = "upload-comprovantes.html";
+}
 
 function irCadastro() {
     window.location.href = "cadastro.html";
