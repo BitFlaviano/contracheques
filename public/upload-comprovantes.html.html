@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon"  href="https://kidverte.vteximg.com.br/arquivos/kidvert-favicon.ico?v=636445463116770000">
+    <title>Upload de Contracheques</title>
+    <link rel="stylesheet" href="styleupload.css">                                                          
+</head>
+
+<body style="display:none;">
+
+    <div class="box">
+        <h2>Enviar PDF</h2>
+
+        <input type="file" id="pdf" accept="application/pdf">
+        <button onclick="enviarPDF()">Enviar</button>
+
+        <div id="loading" style="display:none;">
+          <div class="dots"></div>
+            
+          </div>
+
+        <p id="msg"></p>
+    </div>
+    <footer class="site-footer">&copy; Flaviano Porto 2026</footer>
+    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+    <script src="script.js"></script>
+    
+</body>
+</html>

@@ -527,7 +527,7 @@ app.get('/download-documento', async (req, res) => {
         const bucket = req.query.bucket;
         const caminho = req.query.caminho;
 
-        if (!['contracheques', 'folhas-ponto', 'atestados'].includes(bucket) || !caminho) {
+        if (!['contracheques', 'folhas-ponto', 'atestados', 'comprovantes'].includes(bucket) || !caminho) {
             return res.status(400).json({ erro: "Documento inválido" });
         }
 
@@ -1369,6 +1369,34 @@ app.post('/confirmacoes', async (req, res) => {
 
     } catch (err) {
         res.status(500).json({ erro: err.message });
+    }
+});
+
+// =============================
+// FUNÇÃO: UPLOAD DE COMPROVANTES
+// =============================
+app.get('/comprovantes', async (req, res) => {
+
+    try {
+
+        const user =
+            await validarUsuario(req, res);
+
+        if (!user) return;
+
+        const documentos =
+            await listarDocumentosUsuario(
+                user,
+                'comprovante'
+            );
+
+        res.json(documentos);
+
+    } catch (err) {
+
+        res.status(500).json({
+            erro: err.message
+        });
     }
 });
 

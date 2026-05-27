@@ -329,36 +329,96 @@ async function carregarDashboard(user) {
 }
 
 function renderizarListaDocumentos(container, documentos, mensagemVazia) {
+
     if (!container) return;
 
     container.innerHTML = "";
 
     if (!documentos || documentos.length === 0) {
+
         container.innerText = mensagemVazia;
+
         return;
     }
 
     documentos.forEach(file => {
-        const div = document.createElement('div');
-        div.className = "documento";
 
-        const span = document.createElement('span');
-        span.innerText = file.nome;
+        const div =
+            document.createElement("div");
 
-        const button = document.createElement('button');
-        button.className = "btn-download";
-        button.innerText = "Baixar";
+        div.className =
+            "documento";
 
-        button.addEventListener('click', () => {
-            if (file.tipo === "contracheque") {
-                baixarArquivo(file.caminho);
-                return;
+        const span =
+            document.createElement("span");
+
+        span.innerText =
+            file.nome;
+
+        const button =
+            document.createElement("button");
+
+        button.className =
+            "btn-download";
+
+        button.innerText =
+            "Baixar";
+
+        button.addEventListener(
+            "click",
+            async () => {
+
+                // =============================
+                // CONTRACHEQUE
+                // =============================
+                if (
+                    file.tipo === "contracheque"
+                ) {
+
+                    // baixa contracheque
+                    await baixarArquivo(
+                        file.caminho
+                    );
+
+                    // monta caminho do comprovante
+                    const comprovante =
+                        file.caminho
+                            .replace(
+                                /^contracheques\//,
+                                ""
+                            );
+
+                    // tenta baixar comprovante
+                    try {
+
+                        await baixarDocumentoDireto(
+                            "comprovantes",
+                            comprovante
+                        );
+
+                    } catch (err) {
+
+                        console.error(
+                            "Comprovante não encontrado:",
+                            err
+                        );
+                    }
+
+                    return;
+                }
+
+                // =============================
+                // OUTROS DOCUMENTOS
+                // =============================
+                await baixarDocumentoDireto(
+                    file.bucket,
+                    file.caminho
+                );
             }
-
-            baixarDocumentoDireto(file.bucket, file.caminho);
-        });
+        );
 
         div.appendChild(span);
+
         div.appendChild(button);
 
         container.appendChild(div);
@@ -1961,6 +2021,7 @@ document.addEventListener(
                 }
 
                 carregarDashboard(user);
+                carregarComprovantes(user);
                 configurarComboAnosSolicitacao();
                 carregarSolicitacoes();
             }
@@ -2281,6 +2342,234 @@ async function carregarContrachequesAdmin(user) {
             "Erro inesperado.";
 
     } finally {
+
+        if (loading) {
+            loading.style.display =
+                "none";
+        }
+    }
+}
+
+// ===========================================
+// CARREGAR COMPROVANTES
+// ===========================================
+async function carregarComprovantes(user) {
+
+    const lista =
+        document.getElementById("lista-comprovantes");
+
+    if (!lista) return;
+
+    lista.innerHTML = "";
+
+    try {
+
+        const session =
+            await client.auth.getSession();
+
+        const token =
+            session.data.session?.access_token;
+
+        if (!token) {
+            window.location.href = "login.html";
+            return;
+        }
+
+        const res = await fetch(
+            `${API_URL}/documentos?tipo=comprovante`,
+            {
+                headers: {
+                    Authorization: `Bearer ${token}`
+                }
+            }
+        );
+
+        if (!res.ok) {
+            throw new Error(
+                "Erro ao carregar comprovantes"
+            );
+        }
+
+        const comprovantes =
+            await res.json();
+
+        if (
+            !comprovantes ||
+            comprovantes.length === 0
+        ) {
+
+            lista.innerHTML =
+                "Nenhum comprovante disponível.";
+
+            return;
+        }
+
+        comprovantes.forEach(file => {
+
+            const div =
+                document.createElement("div");
+
+            div.className =
+                "documento";
+
+            const span =
+                document.createElement("span");
+
+            span.innerText =
+                file.nome;
+
+            const botao =
+                document.createElement("button");
+
+            botao.className =
+                "btn-download";
+
+            botao.innerText =
+                "Baixar";
+
+            botao.addEventListener(
+                "click",
+                () => {
+
+                    baixarDocumentoDireto(
+                        file.bucket,
+                        file.caminho
+                    );
+                }
+            );
+
+            div.appendChild(span);
+            div.appendChild(botao);
+
+            lista.appendChild(div);
+        });
+
+    } catch (err) {
+
+        console.error(err);
+
+        lista.innerHTML =
+            "Erro ao carregar comprovantes.";
+    }
+}
+
+// ===========================================
+// ENVIAR COMPROVANTE
+// ===========================================
+async function enviarComprovante() {
+
+    if (enviandoArquivo) return;
+
+    enviandoArquivo = true;
+
+    const fileInput =
+        document.getElementById("pdf");
+
+    const file =
+        fileInput?.files[0];
+
+    const msg =
+        document.getElementById("msg");
+
+    const loading =
+        document.getElementById("loading");
+
+    try {
+
+        if (!file) {
+
+            msg.innerText =
+                "Selecione um PDF.";
+
+            msg.style.color =
+                "red";
+
+            return;
+        }
+
+        if (
+            file.type !==
+            "application/pdf"
+        ) {
+
+            msg.innerText =
+                "Envie apenas PDF.";
+
+            msg.style.color =
+                "red";
+
+            return;
+        }
+
+        const formData =
+            new FormData();
+
+        formData.append(
+            "pdf",
+            file
+        );
+
+        if (loading) {
+            loading.style.display =
+                "block";
+        }
+
+        const session =
+            await client.auth.getSession();
+
+        const token =
+            session.data.session?.access_token;
+
+        const res = await fetch(
+            "/upload-comprovante",
+            {
+                method: "POST",
+
+                headers: {
+                    Authorization:
+                        `Bearer ${token}`
+                },
+
+                body: formData
+            }
+        );
+
+        const data =
+            await res.json();
+
+        if (res.ok) {
+
+            msg.innerText =
+                "Comprovante enviado com sucesso.";
+
+            msg.style.color =
+                "green";
+
+            fileInput.value = "";
+
+        } else {
+
+            msg.innerText =
+                data?.erro ||
+                "Erro no upload.";
+
+            msg.style.color =
+                "red";
+        }
+
+    } catch (err) {
+
+        console.error(err);
+
+        msg.innerText =
+            "Erro inesperado.";
+
+        msg.style.color =
+            "red";
+
+    } finally {
+
+        enviandoArquivo = false;
 
         if (loading) {
             loading.style.display =

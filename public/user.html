@@ -1,11 +1,13 @@
-<!DOCTYPE html>
+<!DOCTYPE html> 
 <html lang="pt-br">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="icon"  href="https://kidverte.vteximg.com.br/arquivos/kidvert-favicon.ico?v=636445463116770000">
+    <link rel="icon" href="https://kidverte.vteximg.com.br/arquivos/kidvert-favicon.ico?v=636445463116770000">
     <title>Painel do Colaborador</title>
+
     <link rel="stylesheet" href="styleadmin.css">
+
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 
@@ -13,131 +15,360 @@
 
     <!-- HEADER -->
     <div class="header">
+
         <h1>Painel do Colaborador</h1>
+
         <div class="header-actions">
-            <button class="hamburger" type="button" onclick="toggleMenuMobile()">☰</button>
-            <button class="header-logout" onclick="fazerLogout()">Sair</button>
+
+            <button
+                class="hamburger"
+                type="button"
+                onclick="toggleMenuMobile()">
+
+                ☰
+            </button>
+
+            <button
+                class="header-logout"
+                onclick="fazerLogout()">
+
+                Sair
+            </button>
+
         </div>
+
     </div>
 
+    <!-- MENU -->
     <div class="menu">
-        <button type="button" onclick="mostrarSecaoUser('secao-solicitacao')">Solicitar contracheques anteriores</button>
-        <button type="button" onclick="mostrarSecaoUser('secao-atestado')">Enviar atestado</button>
-        <button class="menu-logout" onclick="fazerLogout()">Sair</button>
+
+        <button
+            type="button"
+            onclick="mostrarSecaoUser('secao-solicitacao')">
+
+            Solicitar contracheques anteriores
+        </button>
+
+        <button
+            type="button"
+            onclick="mostrarSecaoUser('secao-atestado')">
+
+            Enviar atestado
+        </button>
+
+        <button
+            class="menu-logout"
+            onclick="fazerLogout()">
+
+            Sair
+        </button>
+
     </div>
 
+    <!-- CONTRACHEQUES -->
     <div class="container">
-        
+
         <div class="card">
 
             <div class="header-card">
-                <h3>Bem-vindo, <span id="nome-usuario"></span>!</h3>
 
-                
+                <h3>
+                    Bem-vindo,
+                    <span id="nome-usuario"></span>!
+                </h3>
+
             </div>
-            
-            
-            
-            
-            
+
             <p>Seus contracheques:</p>
+
             <!-- LOADING -->
             <div id="loading-user" style="display:none;">
                 <div class="dots"></div>
             </div>
+
             <div id="lista-arquivos"></div>
-            <!-- <button id="btn-refresh" class="btn-refresh" onclick="recarregarContracheques()" style="display:none;">
-            ⟳
-            </button> -->
+
         </div>
+
     </div>
 
+    <!-- COMPROVANTES -->
     <div class="container">
+
         <div class="card">
-            <h3>Folha de Ponto</h3>
-            <p class="card-hint">Disponível até o último dia do mês.</p>
-            <div id="lista-ponto"></div>
+
+            <h3>Comprovantes de Pagamento</h3>
+
+            <p class="card-hint">
+                Disponíveis juntamente com os contracheques.
+            </p>
+
+            <div id="lista-comprovantes"></div>
+
         </div>
+
     </div>
 
-    <div class="container secao-menu-user" id="secao-solicitacao" hidden>
+    <!-- FOLHA PONTO -->
+    <div class="container">
+
         <div class="card">
-            <h3>Solicitar Contracheques Anteriores</h3>
-            <label for="solicitacao-ano">Ano</label>
+
+            <h3>Folha de Ponto</h3>
+
+            <p class="card-hint">
+                Disponível até o último dia do mês.
+            </p>
+
+            <div id="lista-ponto"></div>
+
+        </div>
+
+    </div>
+
+    <!-- SOLICITAÇÕES -->
+    <div
+        class="container secao-menu-user"
+        id="secao-solicitacao"
+        hidden>
+
+        <div class="card">
+
+            <h3>
+                Solicitar Contracheques Anteriores
+            </h3>
+
+            <label for="solicitacao-ano">
+                Ano
+            </label>
+
             <select id="solicitacao-ano"></select>
 
             <fieldset class="month-grid">
+
                 <legend>Meses</legend>
-                <label><input type="checkbox" name="solicitacao-mes" value="janeiro"> Janeiro</label>
-                <label><input type="checkbox" name="solicitacao-mes" value="fevereiro"> Fevereiro</label>
-                <label><input type="checkbox" name="solicitacao-mes" value="março"> Março</label>
-                <label><input type="checkbox" name="solicitacao-mes" value="abril"> Abril</label>
-                <label><input type="checkbox" name="solicitacao-mes" value="maio"> Maio</label>
-                <label><input type="checkbox" name="solicitacao-mes" value="junho"> Junho</label>
-                <label><input type="checkbox" name="solicitacao-mes" value="julho"> Julho</label>
-                <label><input type="checkbox" name="solicitacao-mes" value="agosto"> Agosto</label>
-                <label><input type="checkbox" name="solicitacao-mes" value="setembro"> Setembro</label>
-                <label><input type="checkbox" name="solicitacao-mes" value="outubro"> Outubro</label>
-                <label><input type="checkbox" name="solicitacao-mes" value="novembro"> Novembro</label>
-                <label><input type="checkbox" name="solicitacao-mes" value="dezembro"> Dezembro</label>
+
+                <label>
+                    <input
+                        type="checkbox"
+                        name="solicitacao-mes"
+                        value="janeiro">
+
+                    Janeiro
+                </label>
+
+                <label>
+                    <input
+                        type="checkbox"
+                        name="solicitacao-mes"
+                        value="fevereiro">
+
+                    Fevereiro
+                </label>
+
+                <label>
+                    <input
+                        type="checkbox"
+                        name="solicitacao-mes"
+                        value="março">
+
+                    Março
+                </label>
+
+                <label>
+                    <input
+                        type="checkbox"
+                        name="solicitacao-mes"
+                        value="abril">
+
+                    Abril
+                </label>
+
+                <label>
+                    <input
+                        type="checkbox"
+                        name="solicitacao-mes"
+                        value="maio">
+
+                    Maio
+                </label>
+
+                <label>
+                    <input
+                        type="checkbox"
+                        name="solicitacao-mes"
+                        value="junho">
+
+                    Junho
+                </label>
+
+                <label>
+                    <input
+                        type="checkbox"
+                        name="solicitacao-mes"
+                        value="julho">
+
+                    Julho
+                </label>
+
+                <label>
+                    <input
+                        type="checkbox"
+                        name="solicitacao-mes"
+                        value="agosto">
+
+                    Agosto
+                </label>
+
+                <label>
+                    <input
+                        type="checkbox"
+                        name="solicitacao-mes"
+                        value="setembro">
+
+                    Setembro
+                </label>
+
+                <label>
+                    <input
+                        type="checkbox"
+                        name="solicitacao-mes"
+                        value="outubro">
+
+                    Outubro
+                </label>
+
+                <label>
+                    <input
+                        type="checkbox"
+                        name="solicitacao-mes"
+                        value="novembro">
+
+                    Novembro
+                </label>
+
+                <label>
+                    <input
+                        type="checkbox"
+                        name="solicitacao-mes"
+                        value="dezembro">
+
+                    Dezembro
+                </label>
+
             </fieldset>
 
-            <textarea id="solicitacao-motivo" placeholder="Motivo da solicitação"></textarea>
-            <button class="btn-primary-action" type="button" onclick="solicitarContrachequeAnterior()">Solicitar</button>
+            <textarea
+                id="solicitacao-motivo"
+                placeholder="Motivo da solicitação"></textarea>
+
+            <button
+                class="btn-primary-action"
+                type="button"
+                onclick="solicitarContrachequeAnterior()">
+
+                Solicitar
+            </button>
+
             <p id="msg-solicitacao"></p>
+
             <div id="lista-solicitacoes-user"></div>
+
         </div>
+
     </div>
 
-    <div class="container secao-menu-user" id="secao-atestado" hidden>
+    <!-- ATESTADO -->
+    <div
+        class="container secao-menu-user"
+        id="secao-atestado"
+        hidden>
+
         <div class="card">
+
             <h3>Enviar Atestado</h3>
-            <input class="file-input" type="file" id="arquivo-atestado" accept=".pdf,image/*">
-            <button class="btn-primary-action" type="button" onclick="enviarAtestado()">Enviar Atestado</button>
+
+            <input
+                class="file-input"
+                type="file"
+                id="arquivo-atestado"
+                accept=".pdf,image/*">
+
+            <button
+                class="btn-primary-action"
+                type="button"
+                onclick="enviarAtestado()">
+
+                Enviar Atestado
+            </button>
+
             <p id="msg-atestado"></p>
+
         </div>
-    </div>
-
-    <div id="modal-termos" class="modal" style="display:none;">
-
-    <div class="modal-content">
-
-        <h3>Confirmação</h3>
-
-        <p>
-            Declaro que ao clicar no botão download
-            confirmo o recebimento do documento.
-        </p>
-
-        <label class="check-termo">
-            <input type="checkbox" id="aceite-termos">
-            Li e concordo.
-        </label>
-
-        <button id="btn-confirmar-download">
-            Confirmar Download
-        </button>
-
-        <button type="button" onclick="fecharModalTermos()">
-            Fechar
-        </button>
 
     </div>
 
-</div>
+    <!-- MODAL -->
+    <div
+        id="modal-termos"
+        class="modal"
+        style="display:none;">
 
-    <footer class="site-footer">&copy; Flaviano Porto 2026</footer>
+        <div class="modal-content">
+
+            <h3>Confirmação</h3>
+
+            <p>
+                Declaro que ao clicar no botão download
+                confirmo o recebimento do documento.
+            </p>
+
+            <label class="check-termo">
+
+                <input
+                    type="checkbox"
+                    id="aceite-termos">
+
+                Li e concordo.
+
+            </label>
+
+            <button id="btn-confirmar-download">
+                Confirmar Download
+            </button>
+
+            <button
+                type="button"
+                onclick="fecharModalTermos()">
+
+                Fechar
+            </button>
+
+        </div>
+
+    </div>
+
+    <!-- FOOTER -->
+    <footer class="site-footer">
+        &copy; Flaviano Porto 2026
+    </footer>
 
     <script>
         window.addEventListener("DOMContentLoaded", () => {
 
-            const btn = document.getElementById("btn-login");
+            const btn =
+                document.getElementById("btn-login");
 
             if (btn) {
-                btn.addEventListener("click", fazerLogin);
+                btn.addEventListener(
+                    "click",
+                    fazerLogin
+                );
             }
         });
     </script>
+
     <script src="script.js"></script>
+
 </body>
 </html>
