@@ -895,6 +895,7 @@ app.put('/solicitacoes-contracheques/:id', async (req, res) => {
 
 // =============================
 // FUNÇÃO: LISTAR ATESTADOS
+// ?baixados=true → confirmados; padrão → pendentes
 // =============================
 app.get('/atestados', async (req, res) => {
 
@@ -905,10 +906,13 @@ app.get('/atestados', async (req, res) => {
 
         if (!admin) return;
 
+        const baixados = req.query.baixados === 'true';
+
         const { data, error } =
             await supabaseAdmin
                 .from('atestados')
                 .select('*')
+                .eq('baixado', baixados)
                 .order(
                     'criado_em',
                     { ascending: false }
@@ -933,6 +937,59 @@ app.get('/atestados', async (req, res) => {
         res.status(500).json({
             erro: err.message
         });
+    }
+});
+
+// =============================
+// FUNÇÃO: DOWNLOAD DE ATESTADO (admin)
+// Retorna o arquivo e marca baixado=true
+// =============================
+app.get('/atestados/download/:id', async (req, res) => {
+    try {
+        const admin = await validarAdmin(req, res);
+        if (!admin) return;
+
+        const { data: atestado, error: erroBusca } = await supabaseAdmin
+            .from('atestados')
+            .select('*')
+            .eq('id', req.params.id)
+            .single();
+
+        if (erroBusca || !atestado) {
+            return res.status(404).json({ erro: 'Atestado não encontrado.' });
+        }
+
+        const caminho = atestado.caminho || atestado.arquivo;
+
+        if (!caminho) {
+            return res.status(400).json({ erro: 'Caminho do arquivo não encontrado.' });
+        }
+
+        const { data: fileData, error: erroDownload } = await supabaseAdmin.storage
+            .from('atestados')
+            .download(caminho);
+
+        if (erroDownload || !fileData) {
+            console.error('Erro download storage:', erroDownload);
+            return res.status(500).json({ erro: 'Erro ao acessar arquivo no storage.' });
+        }
+
+        // marca como baixado
+        await supabaseAdmin
+            .from('atestados')
+            .update({ baixado: true, baixado_em: new Date().toISOString() })
+            .eq('id', req.params.id);
+
+        const buffer = Buffer.from(await fileData.arrayBuffer());
+        const nomeArquivo = atestado.nome_arquivo || caminho.split('/').pop();
+
+        res.setHeader('Content-Type', 'application/octet-stream');
+        res.setHeader('Content-Disposition', `attachment; filename="${nomeArquivo}"`);
+        res.send(buffer);
+
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ erro: err.message });
     }
 });
 

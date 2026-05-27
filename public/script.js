@@ -1117,19 +1117,36 @@ async function carregarConfirmacoes() {
 
         const periodo = paginaConfirmacoes ? "" : "?periodo=recentes";
 
-        const res = await fetch(`${API_URL}/confirmacoes${periodo}`, {
-            headers: {
-                Authorization: `Bearer ${token}`
-            }
-        });
+        // carrega contracheques confirmados e atestados baixados em paralelo
+        const [resConf, resAtestados] = await Promise.all([
+            fetch(`${API_URL}/confirmacoes${periodo}`, {
+                headers: { Authorization: `Bearer ${token}` }
+            }),
+            fetch(`${API_URL}/atestados?baixados=true`, {
+                headers: { Authorization: `Bearer ${token}` }
+            })
+        ]);
 
-        if (!res.ok) {
-            throw new Error("Erro ao carregar confirmações");
-        }
+        if (!resConf.ok) throw new Error("Erro ao carregar confirmações");
 
-        const confirmacoes = await res.json();
+        const confirmacoes = await resConf.json();
+        const atestadosBaixados = resAtestados.ok ? await resAtestados.json() : [];
 
-        if (!confirmacoes || confirmacoes.length === 0) {
+        // transforma atestados no mesmo formato das confirmações
+        const itensAtestados = atestadosBaixados.map(a => ({
+            nome_usuario: a.nome_usuario,
+            arquivo: a.nome_arquivo || a.arquivo || "Atestado",
+            created_at: a.baixado_em || a.criado_em,
+            confirmado: true,
+            tipo: 'atestado'
+        }));
+
+        const todos = [
+            ...(confirmacoes || []).map(c => ({ ...c, tipo: 'contracheque' })),
+            ...itensAtestados
+        ].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+
+        if (todos.length === 0) {
             lista.innerHTML = "<p>Nenhuma confirmação encontrada.</p>";
             return;
         }
@@ -1137,7 +1154,7 @@ async function carregarConfirmacoes() {
         const tabela = document.createElement("div");
         tabela.className = "confirmacoes-lista";
 
-        confirmacoes.forEach(confirmacao => {
+        todos.forEach(confirmacao => {
             const item = document.createElement("div");
             item.className = "confirmacao";
 
@@ -1162,12 +1179,18 @@ async function carregarConfirmacoes() {
             info.appendChild(data);
 
             const status = document.createElement("span");
-            status.className = confirmacao.confirmado
-                ? "status-confirmado"
-                : "status-pendente";
-            status.textContent = confirmacao.confirmado
-                ? "Confirmado"
-                : "Pendente";
+
+            if (confirmacao.tipo === 'atestado') {
+                status.className = "status-confirmado";
+                status.textContent = "Atestado baixado";
+            } else {
+                status.className = confirmacao.confirmado
+                    ? "status-confirmado"
+                    : "status-pendente";
+                status.textContent = confirmacao.confirmado
+                    ? "Confirmado"
+                    : "Pendente";
+            }
 
             item.appendChild(info);
             item.appendChild(status);
@@ -1688,23 +1711,24 @@ async function carregarAtestadosAdmin() {
         const session = await client.auth.getSession();
         const token = session.data.session?.access_token;
 
+        // só pendentes (baixado=false)
         const res = await fetch(`${API_URL}/atestados`, {
             headers: { Authorization: `Bearer ${token}` }
         });
 
         if (!res.ok) throw new Error("Erro ao carregar atestados");
-                        
 
         const atestados = await res.json();
 
         if (!atestados || atestados.length === 0) {
-            lista.innerHTML = "<p>Nenhum atestado enviado.</p>";
+            lista.innerHTML = "<p>Nenhum atestado pendente.</p>";
             return;
         }
 
         atestados.forEach(item => {
             const div = document.createElement("div");
             div.className = "confirmacao";
+            div.id = `atestado-${item.id}`;
 
             const info = document.createElement("div");
             info.className = "confirmacao-info";
@@ -1716,13 +1740,23 @@ async function carregarAtestadosAdmin() {
             arquivo.textContent = item.nome_arquivo || item.arquivo || "Arquivo";
 
             const detalhe = document.createElement("small");
-            detalhe.textContent = `${formatarDataHora(item.created_at)} | ${item.status_email || "registrado"}`;
+            detalhe.textContent = formatarDataHora(item.criado_em || item.created_at);
 
             info.appendChild(nome);
             info.appendChild(arquivo);
             info.appendChild(detalhe);
-            div.appendChild(info);
 
+            const actions = document.createElement("div");
+            actions.className = "actions";
+
+            const btnBaixar = document.createElement("button");
+            btnBaixar.className = "btn-download";
+            btnBaixar.textContent = "Baixar";
+            btnBaixar.addEventListener("click", () => baixarAtestadoAdmin(item.id, item.nome_arquivo, btnBaixar));
+
+            actions.appendChild(btnBaixar);
+            div.appendChild(info);
+            div.appendChild(actions);
             lista.appendChild(div);
         });
 
@@ -1732,6 +1766,62 @@ async function carregarAtestadosAdmin() {
 
     } finally {
         if (loading) loading.style.display = "none";
+    }
+}
+
+async function baixarAtestadoAdmin(id, nomeArquivo, btn) {
+    if (btn) {
+        btn.disabled = true;
+        btn.textContent = "Baixando...";
+    }
+
+    try {
+        const session = await client.auth.getSession();
+        const token = session.data.session?.access_token;
+
+        const res = await fetch(`${API_URL}/atestados/download/${id}`, {
+            headers: { Authorization: `Bearer ${token}` }
+        });
+
+        if (!res.ok) {
+            const erro = await res.json().catch(() => ({}));
+            alert(erro?.erro || "Erro ao baixar atestado.");
+            if (btn) { btn.disabled = false; btn.textContent = "Baixar"; }
+            return;
+        }
+
+        // dispara o download no browser
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = nomeArquivo || "atestado";
+        a.click();
+        URL.revokeObjectURL(url);
+
+        // remove da lista de pendentes e recarrega confirmações
+        const item = document.getElementById(`atestado-${id}`);
+        if (item) {
+            item.style.transition = "opacity 0.4s";
+            item.style.opacity = "0";
+            setTimeout(() => item.remove(), 400);
+
+            // se ficou vazio, mostra mensagem
+            const lista = document.getElementById("lista-atestados-admin");
+            if (lista && lista.querySelectorAll(".confirmacao").length === 1) {
+                setTimeout(() => {
+                    lista.innerHTML = "<p>Nenhum atestado pendente.</p>";
+                }, 450);
+            }
+        }
+
+        // recarrega confirmações para aparecer lá
+        carregarConfirmacoes();
+
+    } catch (err) {
+        console.error(err);
+        alert("Erro inesperado ao baixar atestado.");
+        if (btn) { btn.disabled = false; btn.textContent = "Baixar"; }
     }
 }
 
