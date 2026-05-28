@@ -2524,7 +2524,7 @@ async function enviarComprovante() {
             session.data.session?.access_token;
 
         const res = await fetch(
-            "/upload-comprovante",
+            "/upload-comprovantes",
             {
                 method: "POST",
 
