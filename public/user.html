@@ -528,6 +528,19 @@ document.addEventListener('DOMContentLoaded', async () => {
         const session = await client.auth.getSession();
         if (session.data.session?.user) {
             _meusDadosUser = session.data.session.user;
+            // busca dados mais recentes do servidor
+            try {
+                const token = session.data.session.access_token;
+                const meRes = await fetch(`${API_URL}/me`, {
+                    headers: { Authorization: `Bearer ${token}` }
+                });
+                if (meRes.ok) {
+                    const userData = await meRes.json();
+                    if (userData?.user_metadata) {
+                        _meusDadosUser.user_metadata = userData.user_metadata;
+                    }
+                }
+            } catch(e) {}
             const nomeEl = document.getElementById('nome-usuario');
             if (nomeEl) {
                 nomeEl.textContent = _meusDadosUser.user_metadata?.full_name || 'Colaborador';

@@ -1478,10 +1478,20 @@ app.post('/users/:id/foto', upload.single('foto'), async (req, res) => {
     }
 });
 
-// =============================
-// START
-// =============================
-const PORT = process.env.PORT || 3000;
+app.get('/me', async (req, res) => {
+    try {
+        const authHeader = req.headers.authorization;
+        if (!authHeader) return res.status(401).json({ erro: 'Token não fornecido' });
+        const token = authHeader.replace('Bearer ', '');
+        const { data: { user }, error } = await supabaseAdmin.auth.getUser(token);
+        if (error || !user) return res.status(401).json({ erro: 'Usuário não encontrado' });
+        // busca dados mais recentes no Admin API
+        const { data: userData } = await supabaseAdmin.auth.admin.getUserById(user.id);
+        res.json(userData?.user || user);
+    } catch (err) {
+        res.status(500).json({ erro: err.message });
+    }
+});
 
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'login.html'));
