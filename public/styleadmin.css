@@ -127,6 +127,133 @@ body {
     font-size: 13px;
 }
 
+.metrics-summary {
+    margin-top: 16px;
+}
+
+.metrics-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin: 24px 0 12px;
+}
+
+.metrics-header h3 {
+    margin: 0;
+    color: #111827;
+}
+
+.metrics-header select {
+    width: auto;
+    min-width: 180px;
+    margin-top: 0;
+}
+
+.metrics-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 16px;
+    margin-bottom: 16px;
+}
+
+.metric-panel {
+    min-width: 0;
+    padding: 16px;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    background: #fff;
+}
+
+.metric-panel h3 {
+    margin: 0 0 10px;
+    color: #111827;
+    font-size: 15px;
+}
+
+.metric-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 10px 0;
+    border-bottom: 1px solid #f3f4f6;
+}
+
+.metric-row:last-child {
+    border-bottom: none;
+}
+
+.metric-main {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.metric-main strong,
+.metric-main small {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.metric-main small,
+.metric-muted {
+    color: #6b7280;
+    font-size: 12px;
+}
+
+.metric-value {
+    min-width: 34px;
+    border-radius: 999px;
+    padding: 4px 9px;
+    color: #1d4ed8;
+    background: #eff6ff;
+    text-align: center;
+    font-weight: 700;
+}
+
+.metric-warning {
+    min-height: 18px;
+    margin: 0 0 16px;
+    color: #92400e;
+    font-size: 13px;
+}
+
+.metric-carrossel-wrapper {
+    position: relative;
+    transition: max-height 0.4s ease;
+}
+
+.metric-carrossel-inner {
+    display: flex;
+    flex-direction: column;
+}
+
+.btn-expand-metricas {
+    width: 100%;
+    margin-top: 8px;
+    padding: 6px 10px;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    background: #f9fafb;
+    color: #374151;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.btn-expand-metricas:hover {
+    background: #e5e7eb;
+}
+
+@keyframes scrollVertical {
+    0% { transform: translateY(0); }
+    100% { transform: translateY(calc(var(--scroll-items, 0) * -54px)); }
+}
+
 textarea {
     width: 100%;
     min-height: 82px;
@@ -320,6 +447,30 @@ select,
     background: #dc2626;
 }
 
+.pendente-actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 8px;
+}
+
+.btn-pendente {
+    width: auto;
+    min-height: 34px;
+    padding: 8px 12px;
+    border-radius: 6px;
+    font-size: 13px;
+}
+
+.pendente-actions .btn-outline {
+    color: #374151;
+    background: #fff;
+}
+
+.pendente-actions .btn-delete {
+    border: none;
+}
+
 .loading {
     text-align: center;
     padding: 20px;
@@ -331,6 +482,29 @@ select,
     font-size: 13px;
     text-align: center;
     padding: 20px 30px 28px;
+}
+.upload-status-detalhado {
+    margin-top: 14px;
+    min-height: 48px;
+}
+
+.upload-status-stream {
+    opacity: 0;
+    transform: translateY(6px);
+    transition: opacity 0.35s ease, transform 0.35s ease;
+    background: #eff6ff;
+    border: 1px solid #bfdbfe;
+    color: #1e3a8a;
+    border-radius: 10px;
+    padding: 12px 14px;
+    font-size: 14px;
+    line-height: 1.4;
+    word-break: break-word;
+}
+
+.upload-status-stream.is-visible {
+    opacity: 1;
+    transform: translateY(0);
 }
 .hidden { 
   display: none; 
@@ -389,8 +563,10 @@ select,
     line-height: 1.5;
 }
 
+.modal-content input[type="text"],
 .modal-content input[type="email"],
-.modal-content input[type="password"] {
+.modal-content input[type="password"],
+.modal-content select {
     width: 100%;
     padding: 11px 12px;
     border: 1px solid #d1d5db;
@@ -399,7 +575,8 @@ select,
     font-size: 14px;
 }
 
-.modal-content input:focus {
+.modal-content input:focus,
+.modal-content select:focus {
     border-color: #3b82f6;
     outline: 2px solid rgba(59, 130, 246, 0.18);
 }
@@ -427,6 +604,15 @@ select,
     background: #4b5563;
 }
 
+.modal-actions {
+    display: flex;
+    gap: 10px;
+}
+
+.modal-actions button {
+    flex: 1;
+}
+
 .check-termo {
     display: flex;
     align-items: flex-start;
@@ -444,6 +630,30 @@ select,
     height: 18px;
     margin: 1px 0 0;
     accent-color: #2563eb;
+}
+
+@media (max-width: 900px) {
+    .metrics-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .metrics-header {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .metrics-header select {
+        width: 100%;
+    }
+
+    .confirmacao {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .pendente-actions {
+        justify-content: flex-start;
+    }
 }
 
 .user {
@@ -719,8 +929,21 @@ select,
         justify-content: flex-start !important;
 
         padding-top: 20px;
+        padding-bottom: 72px;
         min-height: 100vh;
         overflow-x: hidden;
+    }
+
+    .site-footer {
+        position: fixed;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        z-index: 30;
+        background: rgba(244, 246, 249, 0.96);
+        backdrop-filter: blur(6px);
+        padding: 12px 20px calc(12px + env(safe-area-inset-bottom, 0px));
+        box-shadow: 0 -8px 18px rgba(15, 23, 42, 0.08);
     }
 
     .container,
@@ -748,6 +971,15 @@ select,
         width: 100%;
         padding: 10px;
         box-sizing: border-box;
+    }
+
+    .upload-status-detalhado {
+        min-height: 64px;
+    }
+
+    .upload-status-stream {
+        font-size: 13px;
+        padding: 10px 12px;
     }
 
 }

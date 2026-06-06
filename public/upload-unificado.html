@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" href="https://kidverte.vteximg.com.br/arquivos/kidvert-favicon.ico?v=636445463116770000">
+    <title>Upload de Documentos</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="style-upload-unificado.css">
+</head>
+
+<body style="display:none;">
+
+    <!-- HEADER -->
+    <div class="header">
+        <h1>Upload de Documentos</h1>
+        <div class="header-actions">
+            <button class="hamburger" type="button" onclick="toggleMenuMobile()">☰</button>
+            <button class="header-logout" onclick="fazerLogout()">Sair</button>
+        </div>
+    </div>
+
+    <!-- MENU -->
+    <div class="menu">
+        <button onclick="irUpload()">Upload Unificado</button>
+        <button onclick="irCadastro()">Cadastrar</button>
+        <button onclick="irConfirmacoes()">Confirmação de recebimento</button>
+        <button class="menu-logout" onclick="fazerLogout()">Sair</button>
+    </div>
+
+    <!-- CONTAINER PRINCIPAL -->
+    <div class="container">
+        <div class="card">
+            <h2>📄 Upload de Documentos</h2>
+            <p class="subtitle">Envie contracheques, comprovantes ou folhas de ponto. O sistema identifica automaticamente.</p>
+
+            <!-- ZONA DE UPLOAD -->
+            <div class="upload-zone" id="uploadZone">
+                <div class="upload-icon">📤</div>
+                <h3>Clique ou arraste arquivos PDF aqui</h3>
+                <p>Aceita: Contracheques, Comprovantes, Folhas de Ponto</p>
+                <input type="file" id="pdfInput" accept="application/pdf" multiple style="display:none;">
+            </div>
+
+            <!-- LISTA DE ARQUIVOS SELECIONADOS -->
+            <div id="fileList" style="margin-top: 20px; display:none;">
+                <h4>Arquivos selecionados:</h4>
+                <div id="filesContainer"></div>
+            </div>
+
+            <!-- LOADING -->
+            <div id="loading" style="display:none; margin-top: 20px;">
+                <div class="spinner"></div>
+                <p>Analisando documentos com Claude...</p>
+            </div>
+
+            <!-- RESULTADOS -->
+            <div id="resultados" style="display:none; margin-top: 20px;">
+                <h3>✅ Análise Concluída</h3>
+                <div id="resultadosList"></div>
+            </div>
+
+            <!-- MENSAGEM -->
+            <p id="msg" style="margin-top: 20px; font-weight: bold;"></p>
+
+            <!-- BOTÕES -->
+            <div class="button-group" style="margin-top: 30px;">
+                <button class="btn-primary" id="btnEnviar" onclick="enviarDocumentos()" style="display:none;">
+                    📤 Enviar Documentos
+                </button>
+                <button class="btn-secondary" id="btnLimpar" onclick="limparSeleção()" style="display:none;">
+                    🗑️ Limpar Seleção
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <footer class="site-footer">&copy; Flaviano Porto 2026</footer>
+
+    <script src="/supabase.js"></script>
+    <script src="script.js"></script>
+    <script src="script-claude.js"></script>
+
+</body>
+</html>

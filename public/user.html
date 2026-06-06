@@ -1,374 +1,201 @@
-<!DOCTYPE html> 
+<!DOCTYPE html>
 <html lang="pt-br">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="icon" href="https://kidverte.vteximg.com.br/arquivos/kidvert-favicon.ico?v=636445463116770000">
-    <title>Painel do Colaborador</title>
-
+    <title>Painel do Colaborador — Kidverte</title>
     <link rel="stylesheet" href="styleadmin.css">
-
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <link rel="stylesheet" href="sidebar.css">
+    <script src="/supabase.js"></script>
 </head>
-
 <body class="user-page" style="display:none;">
 
-    <!-- HEADER -->
-    <div class="header">
+<!-- OVERLAY MOBILE -->
+<div class="sidebar-overlay" id="sidebar-overlay" onclick="fecharSidebar()"></div>
 
-        <h1>Painel do Colaborador</h1>
-
-        <div class="header-actions">
-
-            <button
-                class="hamburger"
-                type="button"
-                onclick="toggleMenuMobile()">
-
-                ☰
-            </button>
-
-            <button
-                class="header-logout"
-                onclick="fazerLogout()">
-
-                Sair
-            </button>
-
+<!-- SIDEBAR -->
+<aside class="sidebar" id="sidebar">
+    <div class="sidebar-brand">
+        <img src="https://kidverte.vteximg.com.br/arquivos/kidvert-favicon.ico?v=636445463116770000" alt="Kidverte" class="sidebar-logo">
+        <div class="sidebar-brand-text">
+            <strong>Kidverte</strong>
+            <small>Área do Colaborador</small>
         </div>
-
     </div>
 
-    <!-- MENU -->
-    <div class="menu">
+    <nav class="sidebar-nav">
+        <a href="#" class="nav-item active" data-secao="contracheques" onclick="irSecaoUser('contracheques',this)">
+            <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+            Contracheques
+            <span class="badge-pendente" id="badge-contracheques" style="display:none">0</span>
+        </a>
+        <a href="#" class="nav-item" data-secao="comprovantes" onclick="irSecaoUser('comprovantes',this)">
+            <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
+            Comprovantes
+            <span class="badge-pendente" id="badge-comprovantes" style="display:none">0</span>
+        </a>
+        <a href="#" class="nav-item" data-secao="ponto" onclick="irSecaoUser('ponto',this)">
+            <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            Folha de Ponto
+            <span class="badge-pendente" id="badge-ponto" style="display:none">0</span>
+        </a>
+        <div class="nav-divider"></div>
+        <a href="#" class="nav-item" data-secao="solicitacao" onclick="irSecaoUser('solicitacao',this)">
+            <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+            Solicitar Anteriores
+        </a>
+        <a href="#" class="nav-item" data-secao="atestado" onclick="irSecaoUser('atestado',this)">
+            <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+            Enviar Atestado
+        </a>
+    </nav>
 
-        <button
-            type="button"
-            onclick="mostrarSecaoUser('secao-solicitacao')">
-
-            Solicitar contracheques anteriores
-        </button>
-
-        <button
-            type="button"
-            onclick="mostrarSecaoUser('secao-atestado')">
-
-            Enviar atestado
-        </button>
-
-        <button
-            class="menu-logout"
-            onclick="fazerLogout()">
-
+    <div class="sidebar-footer">
+        <div class="sidebar-user-info">
+            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+            <span id="nome-usuario">Carregando...</span>
+        </div>
+        <button class="btn-logout-sidebar" onclick="fazerLogout()">
+            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
             Sair
         </button>
+    </div>
+</aside>
 
+<!-- MAIN CONTENT -->
+<main class="main-content">
+
+    <!-- HEADER MOBILE -->
+    <div class="topbar">
+        <button class="hamburger-btn" onclick="abrirSidebar()">
+            <svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+        </button>
+        <span class="topbar-title" id="topbar-title">Contracheques</span>
     </div>
 
     <!-- CONTRACHEQUES -->
-    <div class="container">
-
-        <div class="card">
-
-            <div class="header-card">
-
-                <h3>
-                    Bem-vindo,
-                    <span id="nome-usuario"></span>!
-                </h3>
-
-            </div>
-
-            <p>Seus contracheques:</p>
-
-            <!-- LOADING -->
-            <div id="loading-user" style="display:none;">
-                <div class="dots"></div>
-            </div>
-
-            <div id="lista-arquivos"></div>
-
+    <section class="secao active" id="secao-contracheques">
+        <div class="page-header">
+            <h2>Meus Contracheques</h2>
+            <p class="page-subtitle">Bem-vindo! Seus documentos disponíveis.</p>
         </div>
-
-    </div>
+        <div class="card">
+            <div id="loading-user" style="display:none;"><div class="dots"></div></div>
+            <div id="lista-arquivos"></div>
+        </div>
+    </section>
 
     <!-- COMPROVANTES -->
-    <div class="container">
-
+    <section class="secao" id="secao-comprovantes">
+        <div class="page-header">
+            <h2>Comprovantes de Pagamento</h2>
+            <p class="page-subtitle">Disponíveis juntamente com os contracheques.</p>
+        </div>
         <div class="card">
-
-            <h3>Comprovantes de Pagamento</h3>
-
-            <p class="card-hint">
-                Disponíveis juntamente com os contracheques.
-            </p>
-
             <div id="lista-comprovantes"></div>
-
         </div>
+    </section>
 
-    </div>
-
-    <!-- FOLHA PONTO -->
-    <div class="container">
-
+    <!-- FOLHA DE PONTO -->
+    <section class="secao" id="secao-ponto">
+        <div class="page-header">
+            <h2>Folha de Ponto</h2>
+            <p class="page-subtitle">Disponível até o último dia do mês.</p>
+        </div>
         <div class="card">
-
-            <h3>Folha de Ponto</h3>
-
-            <p class="card-hint">
-                Disponível até o último dia do mês.
-            </p>
-
             <div id="lista-ponto"></div>
-
         </div>
+    </section>
 
-    </div>
-
-    <!-- SOLICITAÇÕES -->
-    <div
-        class="container secao-menu-user"
-        id="secao-solicitacao"
-        hidden>
-
+    <!-- SOLICITAR ANTERIORES -->
+    <section class="secao" id="secao-solicitacao">
+        <div class="page-header">
+            <h2>Solicitar Contracheques Anteriores</h2>
+        </div>
         <div class="card">
-
-            <h3>
-                Solicitar Contracheques Anteriores
-            </h3>
-
-            <label for="solicitacao-ano">
-                Ano
-            </label>
-
+            <label for="solicitacao-ano">Ano</label>
             <select id="solicitacao-ano"></select>
-
             <fieldset class="month-grid">
-
                 <legend>Meses</legend>
-
-                <label>
-                    <input
-                        type="checkbox"
-                        name="solicitacao-mes"
-                        value="janeiro">
-
-                    Janeiro
-                </label>
-
-                <label>
-                    <input
-                        type="checkbox"
-                        name="solicitacao-mes"
-                        value="fevereiro">
-
-                    Fevereiro
-                </label>
-
-                <label>
-                    <input
-                        type="checkbox"
-                        name="solicitacao-mes"
-                        value="março">
-
-                    Março
-                </label>
-
-                <label>
-                    <input
-                        type="checkbox"
-                        name="solicitacao-mes"
-                        value="abril">
-
-                    Abril
-                </label>
-
-                <label>
-                    <input
-                        type="checkbox"
-                        name="solicitacao-mes"
-                        value="maio">
-
-                    Maio
-                </label>
-
-                <label>
-                    <input
-                        type="checkbox"
-                        name="solicitacao-mes"
-                        value="junho">
-
-                    Junho
-                </label>
-
-                <label>
-                    <input
-                        type="checkbox"
-                        name="solicitacao-mes"
-                        value="julho">
-
-                    Julho
-                </label>
-
-                <label>
-                    <input
-                        type="checkbox"
-                        name="solicitacao-mes"
-                        value="agosto">
-
-                    Agosto
-                </label>
-
-                <label>
-                    <input
-                        type="checkbox"
-                        name="solicitacao-mes"
-                        value="setembro">
-
-                    Setembro
-                </label>
-
-                <label>
-                    <input
-                        type="checkbox"
-                        name="solicitacao-mes"
-                        value="outubro">
-
-                    Outubro
-                </label>
-
-                <label>
-                    <input
-                        type="checkbox"
-                        name="solicitacao-mes"
-                        value="novembro">
-
-                    Novembro
-                </label>
-
-                <label>
-                    <input
-                        type="checkbox"
-                        name="solicitacao-mes"
-                        value="dezembro">
-
-                    Dezembro
-                </label>
-
+                <label><input type="checkbox" name="solicitacao-mes" value="janeiro"> Janeiro</label>
+                <label><input type="checkbox" name="solicitacao-mes" value="fevereiro"> Fevereiro</label>
+                <label><input type="checkbox" name="solicitacao-mes" value="março"> Março</label>
+                <label><input type="checkbox" name="solicitacao-mes" value="abril"> Abril</label>
+                <label><input type="checkbox" name="solicitacao-mes" value="maio"> Maio</label>
+                <label><input type="checkbox" name="solicitacao-mes" value="junho"> Junho</label>
+                <label><input type="checkbox" name="solicitacao-mes" value="julho"> Julho</label>
+                <label><input type="checkbox" name="solicitacao-mes" value="agosto"> Agosto</label>
+                <label><input type="checkbox" name="solicitacao-mes" value="setembro"> Setembro</label>
+                <label><input type="checkbox" name="solicitacao-mes" value="outubro"> Outubro</label>
+                <label><input type="checkbox" name="solicitacao-mes" value="novembro"> Novembro</label>
+                <label><input type="checkbox" name="solicitacao-mes" value="dezembro"> Dezembro</label>
             </fieldset>
-
-            <textarea
-                id="solicitacao-motivo"
-                placeholder="Motivo da solicitação"></textarea>
-
-            <button
-                class="btn-primary-action"
-                type="button"
-                onclick="solicitarContrachequeAnterior()">
-
-                Solicitar
-            </button>
-
+            <textarea id="solicitacao-motivo" placeholder="Motivo da solicitação"></textarea>
+            <button class="btn-primary-action" type="button" onclick="solicitarContrachequeAnterior()">Solicitar</button>
             <p id="msg-solicitacao"></p>
-
             <div id="lista-solicitacoes-user"></div>
-
         </div>
+    </section>
 
-    </div>
-
-    <!-- ATESTADO -->
-    <div
-        class="container secao-menu-user"
-        id="secao-atestado"
-        hidden>
-
+    <!-- ENVIAR ATESTADO -->
+    <section class="secao" id="secao-atestado">
+        <div class="page-header">
+            <h2>Enviar Atestado</h2>
+        </div>
         <div class="card">
-
-            <h3>Enviar Atestado</h3>
-
-            <input
-                class="file-input"
-                type="file"
-                id="arquivo-atestado"
-                accept=".pdf,image/*">
-
-            <button
-                class="btn-primary-action"
-                type="button"
-                onclick="enviarAtestado()">
-
-                Enviar Atestado
-            </button>
-
+            <input class="file-input" type="file" id="arquivo-atestado" accept=".pdf,image/*">
+            <button class="btn-primary-action" type="button" onclick="enviarAtestado()">Enviar Atestado</button>
             <p id="msg-atestado"></p>
-
         </div>
+    </section>
 
+</main>
+
+<!-- MODAL TERMOS -->
+<div id="modal-termos" class="modal" style="display:none;">
+    <div class="modal-content">
+        <h3>Confirmação de Recebimento</h3>
+        <p>Declaro que ao realizar o download deste documento, confirmo que recebi devidamente o contracheque/comprovante/folha de ponto e estou de acordo com os termos legais e as diretrizes da LGPD. Esta confirmação serve como comprovante de entrega e recebimento do documento.</p>
+        <label class="check-termo">
+            <input type="checkbox" id="aceite-termos"> Li e concordo com os termos.
+        </label>
+        <button id="btn-confirmar-download">Confirmar Download</button>
+        <button type="button" onclick="fecharModalTermos()">Fechar</button>
     </div>
+</div>
 
-    <!-- MODAL -->
-    <div
-        id="modal-termos"
-        class="modal"
-        style="display:none;">
+<footer class="site-footer">&copy; Flaviano Porto 2026</footer>
+<script src="script.js"></script>
+<script>
+function irSecaoUser(nome, el) {
+    event && event.preventDefault();
+    document.querySelectorAll('.secao').forEach(s => s.classList.remove('active'));
+    document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+    const sec = document.getElementById('secao-' + nome);
+    if (sec) sec.classList.add('active');
+    if (el) el.classList.add('active');
+    document.getElementById('topbar-title').textContent = el ? el.textContent.trim() : nome;
+    fecharSidebar();
 
-        <div class="modal-content">
-
-            <h3>Confirmação</h3>
-
-            <p>
-                Declaro que ao clicar no botão download
-                confirmo o recebimento do documento.
-            </p>
-
-            <label class="check-termo">
-
-                <input
-                    type="checkbox"
-                    id="aceite-termos">
-
-                Li e concordo.
-
-            </label>
-
-            <button id="btn-confirmar-download">
-                Confirmar Download
-            </button>
-
-            <button
-                type="button"
-                onclick="fecharModalTermos()">
-
-                Fechar
-            </button>
-
-        </div>
-
-    </div>
-
-    <!-- FOOTER -->
-    <footer class="site-footer">
-        &copy; Flaviano Porto 2026
-    </footer>
-
-    <script>
-        window.addEventListener("DOMContentLoaded", () => {
-
-            const btn =
-                document.getElementById("btn-login");
-
-            if (btn) {
-                btn.addEventListener(
-                    "click",
-                    fazerLogin
-                );
-            }
-        });
-    </script>
-
-    <script src="script.js"></script>
-
+    const mapa = { contracheques: 'badge-contracheques', comprovantes: 'badge-comprovantes', ponto: 'badge-ponto' };
+    const b = document.getElementById(mapa[nome]);
+    if (b) { b.textContent = '0'; b.style.display = 'none'; }
+}
+function abrirSidebar() {
+    document.getElementById('sidebar').classList.add('open');
+    document.getElementById('sidebar-overlay').classList.add('visible');
+}
+function fecharSidebar() {
+    document.getElementById('sidebar').classList.remove('open');
+    document.getElementById('sidebar-overlay').classList.remove('visible');
+}
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+        const modal = document.getElementById('modal-termos');
+        if (modal && modal.style.display === 'flex') fecharModalTermos();
+    }
+});
+</script>
 </body>
 </html>

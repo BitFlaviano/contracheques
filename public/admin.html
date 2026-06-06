@@ -3,155 +3,1212 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="icon"  href="https://kidverte.vteximg.com.br/arquivos/kidvert-favicon.ico?v=636445463116770000">
-    <title>Painel Administrativo</title>
+    <link rel="icon" href="https://kidverte.vteximg.com.br/arquivos/kidvert-favicon.ico?v=636445463116770000">
+    <title>Painel Administrativo — Kidverte</title>
     <link rel="stylesheet" href="styleadmin.css">
-    
-    
+    <link rel="stylesheet" href="sidebar.css">
 </head>
 <body style="display:none;">
-    
-    <!-- HEADER -->
-    <div class="header">
-        <h1>Painel Administrativo</h1>
-        <div class="header-actions">
-            <button class="hamburger" type="button" onclick="toggleMenuMobile()">☰</button>
-            <button class="header-logout" onclick="fazerLogout()">Sair</button>
+
+<!-- nome-usuario oculto: necessário para script.js setar o nome do admin -->
+<span id="nome-usuario" style="display:none"></span>
+
+<!-- OVERLAY MOBILE -->
+<div class="sidebar-overlay" id="sidebar-overlay" onclick="fecharSidebar()"></div>
+
+<!-- SIDEBAR -->
+<aside class="sidebar" id="sidebar">
+    <div class="sidebar-brand">
+        <img src="https://kidverte.vteximg.com.br/arquivos/kidvert-favicon.ico?v=636445463116770000" alt="Kidverte" class="sidebar-logo">
+        <div class="sidebar-brand-text">
+            <strong>Kidverte</strong>
+            <small>Gestão de RH</small>
         </div>
-        
     </div>
 
-    <!-- MENU -->
-    <div class="menu">
-        <button onclick="irCadastro()">Cadastrar</button>
-        <button onclick="irUpload()">Upload contracheques</button>
-        <button onclick="irUploadPonto()">Upload ponto</button>
-        <button onclick="irUploadComprovantes()">Upload comprovantes</button>
-        <button onclick="irConfirmacoes()">Confirmação de recebimento</button>
-        <button class="menu-logout" onclick="fazerLogout()">Sair</button>
-    </div>
+    <nav class="sidebar-nav">
+        <a href="#" class="nav-item active" onclick="irSecao('painel',this)">
+            <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+            Painel
+        </a>
+        <a href="#" class="nav-item" onclick="irSecao('meus-contracheques',this)">
+            <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+            Meus Contracheques
+        </a>
+        <a href="#" class="nav-item" onclick="irSecao('usuarios',this)">
+            <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+            Usuários
+        </a>
+        <a href="#" class="nav-item" onclick="irSecao('upload',this)">
+            <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+            Upload
+        </a>
+        <a href="#" class="nav-item" onclick="irSecao('confirmacoes',this)">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+            Confirmações
+            <span class="badge-pendente" id="badge-confirmacoes" style="display:none">0</span>
+        </a>
+        <a href="#" class="nav-item" onclick="irSecao('atestados',this)">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="9" y1="15" x2="15" y2="15"/></svg>
+            Atestados
+            <span class="badge-pendente" id="badge-atestados" style="display:none">0</span>
+        </a>
+        <a href="#" class="nav-item nav-item-pendente" onclick="irSecao('pendentes',this)">
+            <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+            Pendentes
+            <span class="badge-pendente" id="badge-pendentes" style="display:none">0</span>
+        </a>
+    </nav>
 
-    <div class="container">
-        <div class="card">
-            <h3>Bem-vindo, <span id="nome-usuario"></span>!</h3>
-            <!-- <div class="container"> -->
-                    
-                    <h3>Meus Contracheques</h3>
-                    <div id="loading-user" style="display:none;">
-                        <div class="dots"></div>
-                            <!-- <p>Buscando contracheques...</p> -->
-                        </div>
-
-                    <!-- <div id="lista-arquivos-admin"></div> -->
-                    <div id="lista-arquivos"></div>
-                
-            <!-- </div> -->
+    <div class="sidebar-footer">
+        <div class="sidebar-user-info">
+            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+            <span id="nome-usuario-sidebar">—</span>
         </div>
-        
+        <button class="btn-logout-sidebar" onclick="fazerLogout()">
+            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+            Sair
+        </button>
+    </div>
+</aside>
+
+<!-- MAIN -->
+<main class="main-content">
+
+    <div class="topbar">
+        <button class="hamburger-btn" onclick="abrirSidebar()">
+            <svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+        </button>
+        <span class="topbar-title" id="topbar-title">Painel</span>
     </div>
 
-    <!-- LISTA DE USUÁRIOS -->
-     
-    <!-- CONTEÚDO -->
-    <div class="container">
-        <div class="card">
-            <h3>Usuários do Sistema</h3>
-            <!-- <div id="lista-usuarios" class="loading"><div class="dots"></div></div> -->
-             <div id="loading-usuarios" style="display:none;">
-            <div class="dots"></div>
+    <!-- PAINEL -->
+    <section class="secao active" id="secao-painel">
+        <div class="page-header">
+            <div>
+                <h2>Painel</h2>
+                <p class="page-subtitle">Visão geral do sistema</p>
             </div>
+        </div>
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-icon stat-icon-blue">
+                    <svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+                </div>
+                <div class="stat-info">
+                    <span class="stat-label">Funcionários</span>
+                    <span class="stat-value" id="stat-funcionarios">—</span>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon stat-icon-green">
+                    <svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+                </div>
+                <div class="stat-info">
+                    <span class="stat-label">Confirmações (30d)</span>
+                    <span class="stat-value" id="stat-confirmacoes">—</span>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon stat-icon-orange">
+                    <svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                </div>
+                <div class="stat-info">
+                    <span class="stat-label">Docs Pendentes</span>
+                    <span class="stat-value" id="stat-pendentes">—</span>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon stat-icon-purple">
+                    <svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                </div>
+                <div class="stat-info">
+                    <span class="stat-label">Atestados no periodo</span>
+                    <span class="stat-value" id="stat-atestados">—</span>
+                </div>
+            </div>
+        </div>
+        <div class="stats-grid metrics-summary">
+        <div class="stat-card">
+            <div class="stat-icon stat-icon-blue">
+                <svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M3 12h18"/><path d="M3 6h18"/><path d="M3 18h18"/></svg>
+            </div>
+            <div class="stat-info">
+                <span class="stat-label">Acessos no periodo</span>
+                <span class="stat-value" id="stat-acessos">—</span>
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon stat-icon-green">
+                <svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+            </div>
+            <div class="stat-info">
+                <span class="stat-label">Solicitacoes no periodo</span>
+                <span class="stat-value" id="stat-solicitacoes">—</span>
+            </div>
+        </div>
+        </div>
+        <div class="metrics-header">
+            <h3>Metricas</h3>
+            <select id="metricas-periodo" onchange="carregarMetricasAdmin()">
+                <option value="7">Ultimos 7 dias</option>
+                <option value="30" selected>Ultimos 30 dias</option>
+                <option value="90">Ultimos 90 dias</option>
+                <option value="365">Ultimos 12 meses</option>
+                <option value="todos">Todo o periodo</option>
+            </select>
+        </div>
+        <div class="metrics-grid">
+            <div class="metric-panel">
+                <h3>Acessos por funcionario</h3>
+                <div id="metricas-acessos"></div>
+            </div>
+            <div class="metric-panel">
+                <h3>Solicitacoes por funcionario</h3>
+                <div id="metricas-solicitacoes"></div>
+            </div>
+            <div class="metric-panel">
+                <h3>Atestados por funcionario</h3>
+                <div id="metricas-atestados"></div>
+            </div>
+        </div>
+        <p id="metricas-aviso" class="metric-warning"></p>
+        <div class="dashboard-grid">
+            <div class="card">
+                <h3>Confirmações Recentes</h3>
+                <p class="card-hint">Últimos 30 dias.</p>
+                <div id="loading-confirmacoes" style="display:none;"><div class="dots"></div></div>
+                <div id="lista-confirmacoes"></div>
+            </div>
+            <div class="card">
+                <h3>Atestados Pendentes</h3>
+                <div id="loading-atestados-admin" style="display:none;"><div class="dots"></div></div>
+                <div id="lista-atestados-admin"></div>
+            </div>
+        </div>
+    </section>
 
+    <!-- USUÁRIOS -->
+    <section class="secao" id="secao-meus-contracheques">
+        <div class="page-header">
+            <div>
+                <h2>Meus Contracheques</h2>
+                <p class="page-subtitle">Ultimos 3 contracheques disponiveis para seu usuario admin</p>
+            </div>
+        </div>
+        <div class="card">
+            <div id="loading-admin" style="display:none;"><div class="dots"></div></div>
+            <div id="lista-arquivos-admin"></div>
+        </div>
+    </section>
+
+    <section class="secao" id="secao-usuarios">
+        <div class="page-header">
+            <div>
+                <h2>Usuários</h2>
+                <p class="page-subtitle">Funcionários cadastrados no sistema</p>
+            </div>
+            <button class="btn-primary" onclick="irCadastro()">
+                <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                Cadastrar
+            </button>
+        </div>
+        <div class="card">
+            <input type="text" id="busca-usuario" class="input-busca" placeholder="🔍  Buscar por nome ou email..." oninput="filtrarUsuarios()">
+            <div id="loading-usuarios" style="display:none;"><div class="dots"></div></div>
             <div id="lista-usuarios"></div>
         </div>
-    </div>
+    </section>
 
-    <div class="container">
-        <div class="card">
-            <h3>Confirmações de Recebimento</h3>
-            <p class="card-hint">Últimos 30 dias. O histórico completo fica em Confirmação de recebimento.</p>
-            <div id="loading-confirmacoes" style="display:none;">
+    <!-- UPLOAD -->
+    <section class="secao" id="secao-upload">
+        <div class="page-header">
+            <div>
+                <h2>Upload de Documentos</h2>
+                <p class="page-subtitle">A IA identifica o funcionário e o tipo automaticamente</p>
+            </div>
+        </div>
+        <div class="card upload-card">
+            <div class="upload-zone" id="upload-zone"
+                ondragover="event.preventDefault(); this.classList.add('drag-over')"
+                ondragleave="this.classList.remove('drag-over')"
+                ondrop="handleUploadDrop(event)">
+                <svg width="48" height="48" fill="none" stroke="#9ca3af" stroke-width="1.5" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                <p class="upload-title">Arraste o PDF aqui ou clique para selecionar</p>
+                <p class="upload-hint">Contracheques, Comprovantes ou Folha de Ponto</p>
+                <input type="file" id="input-upload-inteligente" accept=".pdf" style="display:none" onchange="processarUploadInteligente(this.files[0])">
+                <button class="btn-outline" onclick="document.getElementById('input-upload-inteligente').click()">Selecionar PDF</button>
+            </div>
+        </div>
+        <div id="upload-progresso" style="display:none;" class="card">
+            <div class="upload-status">
                 <div class="dots"></div>
+                <p id="upload-status-msg">Enviando arquivo...</p>
             </div>
-
-            <div id="lista-confirmacoes"></div>
+            <div id="upload-status-detalhado" class="upload-status-detalhado" aria-live="polite">
+                <div id="upload-status-stream" class="upload-status-stream"></div>
+            </div>
         </div>
-    </div>
+        <div id="upload-resultado" style="display:none;" class="card">
+            <h3>Resultado do Processamento</h3>
+            <div id="upload-resultado-lista"></div>
+        </div>
+    </section>
 
-    <div class="container">
+    <!-- CONFIRMAÇÕES -->
+    <section class="secao" id="secao-confirmacoes">
+        <div class="page-header">
+            <div>
+                <h2>Confirmações de Recebimento</h2>
+                <p class="page-subtitle">Histórico completo</p>
+            </div>
+        </div>
         <div class="card">
-            <h3>Solicitações de Contracheques Anteriores</h3>
-            <div id="loading-solicitacoes-admin" style="display:none;">
-                <div class="dots"></div>
+            <div class="filtros-bar">
+                <select id="filtro-funcionario" onchange="aplicarFiltros()">
+                    <option value="">Todos os funcionários</option>
+                </select>
+                <select id="filtro-mes" onchange="aplicarFiltros()">
+                    <option value="">Todos os meses</option>
+                </select>
             </div>
-            <div id="lista-solicitacoes-admin"></div>
+            <div id="loading-confirmacoes-full" style="display:none;"><div class="dots"></div></div>
+            <div id="lista-confirmacoes-full"></div>
         </div>
-    </div>
+    </section>
 
-    <div class="container">
+    <!-- ATESTADOS -->
+    <section class="secao" id="secao-atestados">
+        <div class="page-header">
+            <h2>Histórico de Atestados</h2>
+            <p class="page-subtitle">Atestados enviados pelos funcionários</p>
+        </div>
         <div class="card">
-            <h3>Histórico de Atestados</h3>
-            <div id="loading-atestados-admin" style="display:none;">
-                <div class="dots"></div>
+            <div id="loading-atestados-full" style="display:none;"><div class="dots"></div></div>
+            <div id="lista-atestados-full"></div>
+        </div>
+    </section>
+
+    <!-- PENDENTES -->
+    <section class="secao" id="secao-pendentes">
+        <div class="page-header">
+            <div>
+                <h2>Documentos Pendentes</h2>
+                <p class="page-subtitle">Documentos não identificados pela IA — vincule manualmente</p>
             </div>
-            <div id="lista-atestados-admin"></div>
+        </div>
+        <div class="card">
+            <div id="loading-pendentes" style="display:none;"><div class="dots"></div></div>
+            <div id="lista-pendentes"></div>
+        </div>
+    </section>
+
+</main>
+
+<!-- MODAIS -->
+<div id="modal-senha" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); justify-content:center; align-items:center; z-index:1000;">
+    <div class="modal-content" style="background:white; padding:30px; border-radius:10px; width:350px;">
+        <h3>Alterar Senha</h3>
+        <input type="password" id="nova-senha" placeholder="Nova senha" style="width:100%; padding:8px; margin-bottom:10px; box-sizing:border-box;">
+        <input type="password" id="confirmar-senha" placeholder="Confirmar senha" style="width:100%; padding:8px; margin-bottom:10px; box-sizing:border-box;">
+        <div style="display:flex; gap:10px;">
+            <button onclick="confirmarAlteracaoSenha()">Salvar</button>
+            <button onclick="fecharModalSenha()" style="background:#6c757d;">Cancelar</button>
+        </div>
+        <p id="msg-senha" style="margin-top:10px;"></p>
+    </div>
+</div>
+
+<div id="modal-editar" style="display:none;" class="modal">
+    <div class="modal-content">
+        <h3>Alterar Cadastro</h3>
+        <input type="email" id="edit-email" placeholder="Novo email">
+        <input type="password" id="edit-senha" placeholder="Nova senha (opcional)">
+        <p id="msg-editar"></p>
+        <button onclick="confirmarAlteracaoCadastro()">Salvar</button>
+        <button onclick="fecharModalEditar()">Cancelar</button>
+    </div>
+</div>
+
+<div id="modal-cadastro" style="display:none;" class="modal">
+    <div class="modal-content modal-content-cadastro">
+        <h3>Cadastrar Funcionario</h3>
+        <input type="text" id="nome" placeholder="Nome completo">
+        <input type="email" id="email" placeholder="Email">
+        <input type="password" id="senha" placeholder="Senha provisoria">
+        <input type="text" id="cpf" placeholder="CPF">
+        <select id="tipo">
+            <option value="funcionario">Funcionario</option>
+            <option value="user">Usuario</option>
+            <option value="admin">Admin</option>
+        </select>
+        <p id="msg" style="font-size:13px;min-height:18px;"></p>
+        <div class="modal-actions">
+            <button onclick="cadastrar()">Cadastrar</button>
+            <button type="button" onclick="fecharModalCadastro()">Cancelar</button>
         </div>
     </div>
+</div>
 
-    <!-- MODAL ALTERAR SENHA -->
-    <div id="modal-senha" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); justify-content:center; align-items:center;">
-        <div class="modal-content" style="background:white; padding:30px; border-radius:10px; width:350px;">
-            <h3>Alterar Senha</h3>
-            <input type="password" id="nova-senha" placeholder="Nova senha" style="width:100%; padding:8px; margin-bottom:10px; box-sizing:border-box;">
-            <input type="password" id="confirmar-senha" placeholder="Confirmar senha" style="width:100%; padding:8px; margin-bottom:10px; box-sizing:border-box;">
-            <div style="display:flex; gap:10px;">
-                <button onclick="confirmarAlteracaoSenha()">Salvar</button>
-                <button onclick="fecharModalSenha()" style="background:#6c757d;">Cancelar</button>
-            </div>
-            <p id="msg-senha" style="margin-top:10px;"></p>
+<div id="modal-termos" class="modal" style="display:none;">
+    <div class="modal-content">
+        <h3>Confirmação de Recebimento</h3>
+        <p>Declaro que ao realizar o download deste documento, confirmo que recebi devidamente o contracheque/comprovante/folha de ponto e estou de acordo com os termos legais e as diretrizes da LGPD. Esta confirmação serve como comprovante de entrega e recebimento do documento.</p>
+        <label class="check-termo"><input type="checkbox" id="aceite-termos"> Li e concordo com os termos.</label>
+        <button id="btn-confirmar-download">Confirmar Download</button>
+        <button type="button" onclick="fecharModalTermos()">Fechar</button>
+    </div>
+</div>
+
+<div id="modal-vincular" class="modal" style="display:none;">
+    <div class="modal-content">
+        <h3>Vincular Documento</h3>
+        <p id="modal-vincular-nome-arquivo" style="font-size:13px;color:#6b7280;margin-bottom:12px;"></p>
+        <label>Funcionário</label>
+        <select id="vincular-select-usuario" style="width:100%;margin-bottom:10px;padding:8px;border:1px solid #ddd;border-radius:6px;"></select>
+        <label>Tipo de documento</label>
+        <select id="vincular-select-tipo" style="width:100%;margin-bottom:10px;padding:8px;border:1px solid #ddd;border-radius:6px;">
+            <option value="contracheques">Contracheque</option>
+            <option value="comprovantes">Comprovante de Pagamento</option>
+            <option value="folhas-ponto">Folha de Ponto</option>
+        </select>
+        <label>Mês de Referência</label>
+        <select id="vincular-select-mes" style="width:100%;margin-bottom:10px;padding:8px;border:1px solid #ddd;border-radius:6px;"></select>
+        <p id="msg-vincular" style="font-size:13px;min-height:18px;"></p>
+        <div style="display:flex;gap:10px;margin-top:8px;">
+            <button onclick="confirmarVincularPendente()">Vincular</button>
+            <button onclick="fecharModalVincular()" style="background:#6c757d;">Cancelar</button>
         </div>
     </div>
+</div>
 
-    <div id="modal-editar" style="display:none;" class="modal">
-        <div class="modal-content">
-            <h3>Alterar Cadastro</h3>
+<div id="modal-visualizar-pdf" class="modal" style="display:none;">
+    <div class="modal-content" style="width:90vw;height:90vh;max-width:1200px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+            <h3>Visualizar Documento</h3>
+            <button onclick="fecharVisualizarPdf()" style="width:auto;padding:8px 20px;background:#6c757d;">Fechar</button>
+        </div>
+        <iframe id="pdf-viewer" style="width:100%;height:calc(90vh - 60px);border:none;border-radius:6px;"></iframe>
+    </div>
+</div>
 
-            <input type="email" id="edit-email" placeholder="Novo email">
-            <input type="password" id="edit-senha" placeholder="Nova senha (opcional)">
-
-            <p id="msg-editar"></p>
-
-            <button onclick="confirmarAlteracaoCadastro()">Salvar</button>
-            <button onclick="fecharModalEditar()">Cancelar</button>
+<div id="modal-confirmar" class="modal" style="display:none;">
+    <div class="modal-content">
+        <h3 id="modal-confirmar-titulo">Confirmar</h3>
+        <p id="modal-confirmar-msg" style="color:#4b5563;"></p>
+        <div style="display:flex;gap:10px;margin-top:8px;">
+            <button id="btn-confirmar-sim" style="background:#ef4444;">Sim, excluir</button>
+            <button onclick="fecharModalConfirmar()" style="background:#6c757d;">Cancelar</button>
         </div>
     </div>
+</div>
 
-    <div id="modal-termos" class="modal" style="display:none;">
-        <div class="modal-content">
-            <h3>Confirmação</h3>
+<footer class="site-footer">&copy; Flaviano Porto 2026</footer>
+<script src="/supabase.js"></script>
+<script src="script.js"></script>
+<script>
+// =============================================
+// SIDEBAR
+// =============================================
+let _secaoAtual = 'painel';
+let _usuariosCarregados = false;
+let _confirmFullCarregado = false;
+let _atestadosFullCarregado = false;
+let _pendentesCarregados = false;
+let _contrachequesAdminCarregado = false;
+let _todasConfirmacoesAdmin = [];
 
-            <p>
-                Declaro que ao clicar no botão download
-                confirmo o recebimento do documento.
-            </p>
+function irSecao(nome, el) {
+    event && event.preventDefault();
+    document.querySelectorAll('.secao').forEach(s => s.classList.remove('active'));
+    document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+    document.getElementById('secao-' + nome)?.classList.add('active');
+    if (el) el.classList.add('active');
+    document.getElementById('topbar-title').textContent = el ? el.textContent.trim().replace(/\d+$/, '') : nome;
+    _secaoAtual = nome;
+    fecharSidebar();
 
-            <label class="check-termo">
-                <input type="checkbox" id="aceite-termos">
-                Li e concordo.
-            </label>
+    if (nome === 'usuarios' && !_usuariosCarregados) {
+        _usuariosCarregados = true;
+        carregarUsuarios();
+    }
+    if (nome === 'confirmacoes' && !_confirmFullCarregado) {
+        _confirmFullCarregado = true;
+        carregarConfirmacoesAdmin();
+    }
+    if (nome === 'confirmacoes') {
+        const b = document.getElementById('badge-confirmacoes');
+        if (b) { b.textContent = '0'; b.style.display = 'none'; }
+    }
+    if (nome === 'atestados' && !_atestadosFullCarregado) {
+        _atestadosFullCarregado = true;
+        carregarAtestadosSecao();
+    }
+    if (nome === 'atestados') {
+        const b = document.getElementById('badge-atestados');
+        if (b) { b.textContent = '0'; b.style.display = 'none'; }
+    }
+    if (nome === 'pendentes' && !_pendentesCarregados) {
+        _pendentesCarregados = true;
+        carregarPendentes();
+    }
+    if (nome === 'meus-contracheques' && !_contrachequesAdminCarregado) {
+        _contrachequesAdminCarregado = true;
+        carregarContrachequesAdmin();
+    }
+}
 
-            <button id="btn-confirmar-download">
-                Confirmar Download
-            </button>
+function abrirSidebar() {
+    document.getElementById('sidebar').classList.add('open');
+    document.getElementById('sidebar-overlay').classList.add('visible');
+}
+function fecharSidebar() {
+    document.getElementById('sidebar').classList.remove('open');
+    document.getElementById('sidebar-overlay').classList.remove('visible');
+}
 
-            <button type="button" onclick="fecharModalTermos()">
-                Fechar
-            </button>
-        </div>
-    </div>
+// =============================================
+// SINCRONIZA NOME DO ADMIN NA SIDEBAR
+// =============================================
+const _nomeObserver = new MutationObserver(() => {
+    const t = document.getElementById('nome-usuario')?.textContent?.trim();
+    if (t) document.getElementById('nome-usuario-sidebar').textContent = t;
+});
+document.addEventListener('DOMContentLoaded', () => {
+    const el = document.getElementById('nome-usuario');
+    if (el) _nomeObserver.observe(el, { childList: true, subtree: true, characterData: true });
+    carregarEstatisticas();
+});
 
-    <footer class="site-footer">&copy; Flaviano Porto 2026</footer>
-    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
-    <script src="script.js"></script>
+// =============================================
+// ESTATÍSTICAS DO PAINEL
+// =============================================
+async function carregarEstatisticas() {
+    try {
+        const session = await client.auth.getSession();
+        const token = session.data.session?.access_token;
+        if (!token) return;
+
+        // /users (endpoint correto, igual ao carregarUsuarios)
+        const [resUsers, resConf, resPend, resAtest] = await Promise.all([
+            fetch(`${API_URL}/users`, { headers: { Authorization: `Bearer ${token}` } }),
+            fetch(`${API_URL}/confirmacoes?periodo=recentes`, { headers: { Authorization: `Bearer ${token}` } }),
+            fetch(`${API_URL}/pendentes`, { headers: { Authorization: `Bearer ${token}` } }),
+            fetch(`${API_URL}/atestados`, { headers: { Authorization: `Bearer ${token}` } })
+        ]);
+
+        if (resUsers.ok) {
+            const d = await resUsers.json();
+            document.getElementById('stat-funcionarios').textContent = Array.isArray(d) ? d.length : '—';
+        }
+        if (resConf.ok) {
+            const d = await resConf.json();
+            document.getElementById('stat-confirmacoes').textContent = Array.isArray(d) ? d.length : '—';
+        }
+        if (resPend.ok) {
+            const d = await resPend.json();
+            const n = Array.isArray(d) ? d.length : 0;
+            document.getElementById('stat-pendentes').textContent = n;
+            const badge = document.getElementById('badge-pendentes');
+            if (badge) { badge.textContent = n; badge.style.display = n ? 'inline-flex' : 'none'; }
+        }
+        if (resAtest.ok) {
+            const d = await resAtest.json();
+            document.getElementById('stat-atestados').textContent = Array.isArray(d) ? d.length : '—';
+        }
+    } catch (e) { console.warn('Erro stats:', e); }
+}
+
+// =============================================
+// BUSCA DE USUÁRIOS
+// =============================================
+function filtrarUsuarios() {
+    const termo = (document.getElementById('busca-usuario')?.value || '').toLowerCase().trim();
+    document.querySelectorAll('#lista-usuarios .user').forEach(el => {
+        const texto = el.textContent.toLowerCase();
+        el.style.display = (!termo || texto.includes(termo)) ? '' : 'none';
+    });
+}
+
+// =============================================
+// CONFIRMAÇÕES COM FILTROS (seção dedicada)
+// =============================================
+const MESES_PT = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+
+function _mesValor(dateStr) {
+    if (!dateStr) return null;
+    const d = new Date(dateStr);
+    if (isNaN(d)) return null;
+    return { valor: `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`, label: `${MESES_PT[d.getMonth()]} ${d.getFullYear()}` };
+}
+
+function _popularFiltrosAdmin(lista) {
+    const selFun = document.getElementById('filtro-funcionario');
+    const selMes = document.getElementById('filtro-mes');
+    if (!selFun || !selMes) return;
+
+    const funAtual = selFun.value, mesAtual = selMes.value;
+
+    const nomes = [...new Set(lista.map(i => i.nome_usuario).filter(Boolean))].sort();
+    const mesesMap = new Map();
+    lista.forEach(i => {
+        const m = _mesValor(i.created_at || i.data || i.data_confirmacao);
+        if (m) mesesMap.set(m.valor, m.label);
+    });
+    const meses = [...mesesMap.entries()].sort((a,b) => b[0].localeCompare(a[0]));
+
+    selFun.innerHTML = '<option value="">Todos os funcionários</option>';
+    nomes.forEach(n => { const o = document.createElement('option'); o.value = n; o.textContent = n; selFun.appendChild(o); });
+
+    selMes.innerHTML = '<option value="">Todos os meses</option>';
+    meses.forEach(([v,l]) => { const o = document.createElement('option'); o.value = v; o.textContent = l; selMes.appendChild(o); });
+
+    selFun.value = funAtual;
+    selMes.value = mesAtual;
+}
+
+function _renderConfirmacoesAdmin(itens) {
+    const lista = document.getElementById('lista-confirmacoes-full');
+    if (!lista) return;
+    if (!itens || !itens.length) { lista.innerHTML = '<p>Nenhuma confirmação encontrada.</p>'; return; }
+
+    const wrap = document.createElement('div');
+    wrap.className = 'confirmacoes-lista';
+    itens.forEach(c => {
+        const item = document.createElement('div'); item.className = 'confirmacao';
+        const info = document.createElement('div'); info.className = 'confirmacao-info';
+        const nome = document.createElement('strong'); nome.textContent = c.nome_usuario || 'Sem nome';
+        const arq = document.createElement('span'); arq.textContent = c.arquivo || 'Arquivo';
+        const dt = document.createElement('small'); dt.textContent = formatarDataHora(c.created_at || c.data || c.data_confirmacao);
+        info.append(nome, arq, dt);
+        const st = document.createElement('span');
+        if (c.tipo === 'atestado') { st.className = 'status-confirmado'; st.textContent = 'Atestado baixado'; }
+        else { st.className = c.confirmado ? 'status-confirmado' : 'status-pendente'; st.textContent = c.confirmado ? 'Confirmado' : 'Pendente'; }
+        item.append(info, st);
+        wrap.appendChild(item);
+    });
+    lista.innerHTML = '';
+    lista.appendChild(wrap);
+}
+
+function aplicarFiltros() {
+    const fun = (document.getElementById('filtro-funcionario')?.value || '').trim();
+    const mes = (document.getElementById('filtro-mes')?.value || '').trim();
+    let r = _todasConfirmacoesAdmin;
+    if (fun) r = r.filter(i => i.nome_usuario === fun);
+    if (mes) r = r.filter(i => _mesValor(i.created_at || i.data || i.data_confirmacao)?.valor === mes);
+    _renderConfirmacoesAdmin(r);
+}
+
+async function carregarConfirmacoesAdmin() {
+    const loading = document.getElementById('loading-confirmacoes-full');
+    const lista = document.getElementById('lista-confirmacoes-full');
+    if (!lista) return;
+    if (loading) loading.style.display = 'block';
+    try {
+        const session = await client.auth.getSession();
+        const token = session.data.session?.access_token;
+        const [resConf, resAtest] = await Promise.all([
+            fetch(`${API_URL}/confirmacoes`, { headers: { Authorization: `Bearer ${token}` } }),
+            fetch(`${API_URL}/atestados?baixados=true`, { headers: { Authorization: `Bearer ${token}` } })
+        ]);
+        const conf = resConf.ok ? await resConf.json() : [];
+        const atest = resAtest.ok ? await resAtest.json() : [];
+        const itensAtest = atest.map(a => ({
+            nome_usuario: a.nome_usuario,
+            arquivo: a.nome_arquivo || 'Atestado',
+            created_at: a.baixado_em || a.criado_em,
+            confirmado: true, tipo: 'atestado'
+        }));
+        _todasConfirmacoesAdmin = [
+            ...(conf || []).map(c => ({ ...c, tipo: 'contracheque' })),
+            ...itensAtest
+        ].sort((a,b) => new Date(b.created_at) - new Date(a.created_at));
+        _popularFiltrosAdmin(_todasConfirmacoesAdmin);
+        _renderConfirmacoesAdmin(_todasConfirmacoesAdmin);
+    } catch(e) {
+        console.error(e);
+        if (lista) lista.innerHTML = 'Erro ao carregar confirmações.';
+    } finally {
+        if (loading) loading.style.display = 'none';
+    }
+}
+
+// =============================================
+// ATESTADOS (seção dedicada)
+// =============================================
+async function carregarAtestadosSecao() {
+    const loading = document.getElementById('loading-atestados-full');
+    const lista = document.getElementById('lista-atestados-full');
+    if (!lista) return;
+    if (loading) loading.style.display = 'block';
+    try {
+        const session = await client.auth.getSession();
+        const token = session.data.session?.access_token;
+        const res = await fetch(`${API_URL}/atestados`, { headers: { Authorization: `Bearer ${token}` } });
+        const atestados = res.ok ? await res.json() : [];
+        if (!atestados.length) { lista.innerHTML = '<p>Nenhum atestado pendente.</p>'; return; }
+        lista.innerHTML = '';
+        atestados.forEach(item => {
+            const div = document.createElement('div'); div.className = 'confirmacao'; div.id = `atestado-full-${item.id}`;
+            const info = document.createElement('div'); info.className = 'confirmacao-info';
+            const nome = document.createElement('strong'); nome.textContent = item.nome_usuario || 'Sem nome';
+            const arq = document.createElement('span'); arq.textContent = item.nome_arquivo || 'Arquivo';
+            const dt = document.createElement('small'); dt.textContent = formatarDataHora(item.criado_em || item.created_at);
+            info.append(nome, arq, dt);
+            const btn = document.createElement('button'); btn.className = 'btn-download'; btn.textContent = 'Baixar';
+            btn.addEventListener('click', () => baixarAtestadoAdmin(item.id, item.nome_arquivo, btn));
+            div.append(info, btn);
+            lista.appendChild(div);
+        });
+    } catch(e) { lista.innerHTML = 'Erro ao carregar.'; }
+    finally { if (loading) loading.style.display = 'none'; }
+}
+
+// =============================================
+// UPLOAD INTELIGENTE
+// =============================================
+function handleUploadDrop(e) {
+    e.preventDefault();
+    document.getElementById('upload-zone').classList.remove('drag-over');
+    const file = e.dataTransfer.files[0];
+    if (file && file.type === 'application/pdf') processarUploadInteligente(file);
+    else alert('Por favor envie um arquivo PDF.');
+}
+
+async function processarUploadInteligente(file) {
+    if (!file) return;
+    const progresso = document.getElementById('upload-progresso');
+    const resultado = document.getElementById('upload-resultado');
+    const statusMsg = document.getElementById('upload-status-msg');
+    const statusStream = document.getElementById('upload-status-stream');
+    if (statusStream) { statusStream.textContent = ''; statusStream.classList.remove('is-visible'); }
+    progresso.style.display = 'block';
+    resultado.style.display = 'none';
+    statusMsg.textContent = 'Enviando e processando...';
+    try {
+        const session = await client.auth.getSession();
+        const token = session.data.session?.access_token;
+        const formData = new FormData();
+        formData.append('pdf', file);
+        const res = await fetch('/upload-inteligente', {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${token}` },
+            body: formData
+        });
+        const data = await res.json();
+        progresso.style.display = 'none';
+        resultado.style.display = 'block';
+        const listaRes = document.getElementById('upload-resultado-lista');
+        if (res.ok) {
+            listaRes.innerHTML = `<div class="resultado-item resultado-ok">
+                <div class="resultado-icon">✅</div>
+                <div class="resultado-info">
+                    <strong>Upload concluído</strong>
+                    <span>${data.pendentes || 0} pendente(s)</span>
+                    <small>Email: ${data.status_email || 'não enviado'}</small>
+                </div>
+            </div>`;
+        } else {
+            listaRes.innerHTML = `<div class="resultado-item resultado-pendente">
+                <div class="resultado-icon">⚠️</div>
+                <div class="resultado-info">
+                    <strong>Erro</strong>
+                    <span>${data.erro || res.statusText}</span>
+                </div>
+            </div>`;
+        }
+        carregarEstatisticas();
+        _pendentesCarregados = false;
+    } catch(e) {
+        progresso.style.display = 'none';
+        resultado.style.display = 'block';
+        document.getElementById('upload-resultado-lista').innerHTML = `<div class="resultado-item resultado-pendente">
+            <div class="resultado-icon">⚠️</div>
+            <div class="resultado-info"><strong>Erro de conexão</strong><span>${e.message}</span></div>
+        </div>`;
+    }
+}
+
+// =============================================
+// PENDENTES
+// =============================================
+let _pendenteParaVincular = null;
+
+async function carregarPendentes() {
+    const loading = document.getElementById('loading-pendentes');
+    const lista = document.getElementById('lista-pendentes');
+    if (!lista) return;
+    if (loading) loading.style.display = 'block';
+    try {
+        const session = await client.auth.getSession();
+        const token = session.data.session?.access_token;
+        const res = await fetch(`${API_URL}/pendentes`, { headers: { Authorization: `Bearer ${token}` } });
+        const pendentes = res.ok ? await res.json() : [];
+        const badge = document.getElementById('badge-pendentes');
+        if (badge) { badge.textContent = pendentes.length; badge.style.display = pendentes.length ? 'inline-flex' : 'none'; }
+        if (!pendentes.length) { lista.innerHTML = '<p>Nenhum documento pendente. ✅</p>'; return; }
+        lista.innerHTML = '';
+        pendentes.forEach(p => {
+            const div = document.createElement('div'); div.className = 'confirmacao'; div.id = `pendente-${p.id}`;
+            const info = document.createElement('div'); info.className = 'confirmacao-info';
+            const nome = document.createElement('strong'); nome.textContent = p.nome_extraido || 'Nome não identificado';
+            const arq = document.createElement('span'); arq.textContent = p.nome_arquivo || 'Arquivo';
+            const dt = document.createElement('small'); dt.textContent = formatarDataHora(p.criado_em) + (p.tipo_detectado ? ' · ' + p.tipo_detectado : '');
+            info.append(nome, arq, dt);
+            const btn = document.createElement('button'); btn.className = 'btn-download'; btn.textContent = 'Vincular';
+            btn.addEventListener('click', () => abrirModalVincular(p));
+            div.append(info, btn);
+            lista.appendChild(div);
+        });
+    } catch(e) { lista.innerHTML = 'Erro ao carregar pendentes.'; }
+    finally { if (loading) loading.style.display = 'none'; }
+}
+
+async function abrirModalVincular(pendente) {
+    _pendenteParaVincular = pendente;
+    document.getElementById('modal-vincular-nome-arquivo').textContent = pendente.nome_arquivo || '';
+    document.getElementById('msg-vincular').textContent = '';
+    const select = document.getElementById('vincular-select-usuario');
+    select.innerHTML = '<option value="">Carregando...</option>';
+    const session = await client.auth.getSession();
+    const token = session.data.session?.access_token;
+    const res = await fetch(`${API_URL}/users`, { headers: { Authorization: `Bearer ${token}` } });
+    const usuarios = res.ok ? await res.json() : [];
+    select.innerHTML = '<option value="">Selecione o funcionário</option>';
+    usuarios.forEach(u => {
+        const o = document.createElement('option');
+        o.value = u.id;
+        o.textContent = u.user_metadata?.full_name || u.email;
+        select.appendChild(o);
+    });
+    if (pendente.tipo_detectado) document.getElementById('vincular-select-tipo').value = pendente.tipo_detectado;
+
+    const mesSelect = document.getElementById('vincular-select-mes');
+    const meses = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+    mesSelect.innerHTML = '<option value="">Selecione o mês</option>';
+    meses.forEach((m, i) => {
+        const o = document.createElement('option');
+        o.value = String(i + 1).padStart(2, '0');
+        o.textContent = m;
+        mesSelect.appendChild(o);
+    });
+    if (pendente.mes_detectado) mesSelect.value = pendente.mes_detectado;
+
+    document.getElementById('modal-vincular').style.display = 'flex';
+}
+
+function fecharModalVincular() {
+    document.getElementById('modal-vincular').style.display = 'none';
+    _pendenteParaVincular = null;
+}
+
+async function confirmarVincularPendente() {
+    const userId = document.getElementById('vincular-select-usuario').value;
+    const tipo = document.getElementById('vincular-select-tipo').value;
+    const mesReferencia = document.getElementById('vincular-select-mes').value;
+    const msg = document.getElementById('msg-vincular');
+    if (!userId) { msg.textContent = 'Selecione um funcionário.'; return; }
+    if (!mesReferencia) { msg.textContent = 'Selecione o mês de referência.'; return; }
+    if (!_pendenteParaVincular) return;
+    msg.textContent = 'Vinculando...';
+    try {
+        const session = await client.auth.getSession();
+        const token = session.data.session?.access_token;
+        const idPendente = _pendenteParaVincular.id;
+        const res = await fetch(`${API_URL}/pendentes/${idPendente}/vincular`, {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ user_id: userId, tipo, mes_referencia: mesReferencia })
+        });
+        if (res.ok) {
+            fecharModalVincular();
+            _pendentesCarregados = true;
+            carregarPendentes();
+            carregarEstatisticas();
+        } else {
+            const d = await res.json().catch(() => ({}));
+            msg.textContent = d.erro || 'Erro ao vincular.';
+        }
+    } catch(e) { msg.textContent = 'Erro de conexão.'; }
+}
+function atualizarTexto(id, valor) {
+    const el = document.getElementById(id);
+    if (el) el.textContent = valor;
+}
+
+function renderMetricasLista(id, itens, campo, vazio) {
+    const container = document.getElementById(id);
+    if (!container) return;
+
+    const lista = (itens || [])
+        .filter(item => Number(item[campo] || 0) > 0)
+        .sort((a, b) => Number(b[campo] || 0) - Number(a[campo] || 0))
+        .slice(0, 8);
+
+    container.innerHTML = '';
+
+    if (!lista.length) {
+        const p = document.createElement('p');
+        p.className = 'metric-muted';
+        p.textContent = vazio;
+        container.appendChild(p);
+        return;
+    }
+
+    lista.forEach(item => {
+        const row = document.createElement('div');
+        row.className = 'metric-row';
+
+        const main = document.createElement('div');
+        main.className = 'metric-main';
+
+        const nome = document.createElement('strong');
+        nome.textContent = item.nome || 'Sem nome';
+
+        const email = document.createElement('small');
+        email.textContent = item.email || '';
+
+        const value = document.createElement('span');
+        value.className = 'metric-value';
+        value.textContent = Number(item[campo] || 0);
+
+        main.append(nome, email);
+        row.append(main, value);
+        container.appendChild(row);
+    });
+}
+
+function renderMetricasCarrossel(id, itens, campo, vazio) {
+    const container = document.getElementById(id);
+    if (!container) return;
+
+    const lista = (itens || [])
+        .filter(item => Number(item[campo] || 0) > 0)
+        .sort((a, b) => Number(b[campo] || 0) - Number(a[campo] || 0));
+
+    container.innerHTML = '';
+
+    if (!lista.length) {
+        const p = document.createElement('p');
+        p.className = 'metric-muted';
+        p.textContent = vazio;
+        container.appendChild(p);
+        return;
+    }
+
+    const total = lista.length;
+    const mostrarTodos = total <= 1;
+
+    const wrapper = document.createElement('div');
+    wrapper.className = 'metric-carrossel-wrapper';
+
+    const inner = document.createElement('div');
+    inner.className = 'metric-carrossel-inner';
+
+    lista.forEach(item => {
+        const row = document.createElement('div');
+        row.className = 'metric-row';
+
+        const main = document.createElement('div');
+        main.className = 'metric-main';
+
+        const nome = document.createElement('strong');
+        nome.textContent = item.nome || 'Sem nome';
+
+        const email = document.createElement('small');
+        email.textContent = item.email || '';
+
+        const value = document.createElement('span');
+        value.className = 'metric-value';
+        value.textContent = Number(item[campo] || 0);
+
+        main.append(nome, email);
+        row.append(main, value);
+        inner.appendChild(row);
+    });
+
+    wrapper.appendChild(inner);
+
+    if (!mostrarTodos) {
+        wrapper.style.maxHeight = '54px';
+        wrapper.style.overflow = 'hidden';
+        wrapper.style.position = 'relative';
+
+        const btn = document.createElement('button');
+        btn.className = 'btn-expand-metricas';
+        btn.textContent = `Mostrar todos (${total})`;
+        btn.dataset.expandido = 'false';
+        btn.addEventListener('click', () => {
+            const exp = btn.dataset.expandido === 'true';
+            if (exp) {
+                wrapper.style.maxHeight = '54px';
+                wrapper.style.overflow = 'hidden';
+                btn.textContent = `Mostrar todos (${total})`;
+                btn.dataset.expandido = 'false';
+                inner.style.animationPlayState = 'running';
+            } else {
+                wrapper.style.maxHeight = (total * 54) + 'px';
+                wrapper.style.overflow = 'auto';
+                btn.textContent = 'Recolher';
+                btn.dataset.expandido = 'true';
+                inner.style.animationPlayState = 'paused';
+            }
+        });
+        wrapper.appendChild(btn);
+
+        inner.style.animation = 'scrollVertical 8s linear infinite';
+        inner.style.setProperty('--scroll-items', total);
+
+        wrapper.addEventListener('mouseenter', () => { inner.style.animationPlayState = 'paused'; });
+        wrapper.addEventListener('mouseleave', () => {
+            if (btn.dataset.expandido !== 'true') inner.style.animationPlayState = 'running';
+        });
+    }
+
+    container.appendChild(wrapper);
+}
+
+async function carregarMetricasAdmin() {
+    try {
+        const session = await client.auth.getSession();
+        const token = session.data.session?.access_token;
+        if (!token) return;
+
+        const periodo = document.getElementById('metricas-periodo')?.value || '30';
+        const res = await fetch(`${API_URL}/metricas?dias=${encodeURIComponent(periodo)}`, {
+            headers: { Authorization: `Bearer ${token}` }
+        });
+
+        if (!res.ok) throw new Error('Erro ao carregar metricas.');
+
+        const dados = await res.json();
+        const totais = dados.totais || {};
+
+        atualizarTexto('stat-funcionarios', totais.funcionarios ?? '-');
+        atualizarTexto('stat-confirmacoes', totais.confirmacoes ?? '-');
+        atualizarTexto('stat-pendentes', totais.pendentes ?? '-');
+        atualizarTexto('stat-atestados', totais.atestados ?? '-');
+        atualizarTexto('stat-acessos', totais.acessos ?? '-');
+        atualizarTexto('stat-solicitacoes', totais.solicitacoes ?? '-');
+
+        const badge = document.getElementById('badge-pendentes');
+        if (badge) {
+            const n = Number(totais.pendentes || 0);
+            badge.textContent = n;
+            badge.style.display = n ? 'inline-flex' : 'none';
+        }
+
+        const badgeAtest = document.getElementById('badge-atestados');
+        if (badgeAtest) {
+            const n = Number(totais.atestados || 0);
+            badgeAtest.textContent = n;
+            badgeAtest.style.display = n ? 'inline-flex' : 'none';
+        }
+
+        const badgeConf = document.getElementById('badge-confirmacoes');
+        if (badgeConf) {
+            const n = Number(totais.confirmacoes || 0);
+            badgeConf.textContent = n;
+            badgeConf.style.display = n ? 'inline-flex' : 'none';
+        }
+
+        renderMetricasCarrossel('metricas-acessos', dados.porFuncionario, 'acessos', 'Nenhum acesso no periodo.');
+        renderMetricasLista('metricas-solicitacoes', dados.porFuncionario, 'solicitacoes', 'Nenhuma solicitacao no periodo.');
+        renderMetricasLista('metricas-atestados', dados.porFuncionario, 'atestados', 'Nenhum atestado no periodo.');
+
+        const aviso = document.getElementById('metricas-aviso');
+        if (aviso) {
+            aviso.textContent = (dados.avisos || []).length
+                ? `Algumas metricas dependem de tabelas ainda nao criadas: ${dados.avisos.join(' | ')}`
+                : '';
+        }
+    } catch (e) {
+        console.warn('Erro metricas:', e);
+        atualizarTexto('stat-acessos', '-');
+        atualizarTexto('stat-solicitacoes', '-');
+    }
+}
+
+async function carregarEstatisticas() {
+    return carregarMetricasAdmin();
+}
+
+function tipoPendenteParaSelect(tipo) {
+    const mapa = {
+        contracheque: 'contracheques',
+        contracheques: 'contracheques',
+        comprovante: 'comprovantes',
+        comprovantes: 'comprovantes',
+        'folha-ponto': 'folhas-ponto',
+        'folhas-ponto': 'folhas-ponto'
+    };
+    return mapa[tipo] || 'contracheques';
+}
+
+async function carregarPendentes() {
+    const loading = document.getElementById('loading-pendentes');
+    const lista = document.getElementById('lista-pendentes');
+    if (!lista) return;
+    if (loading) loading.style.display = 'block';
+
+    try {
+        const session = await client.auth.getSession();
+        const token = session.data.session?.access_token;
+        const res = await fetch(`${API_URL}/pendentes`, { headers: { Authorization: `Bearer ${token}` } });
+        const pendentes = res.ok ? await res.json() : [];
+
+        const badge = document.getElementById('badge-pendentes');
+        if (badge) {
+            badge.textContent = pendentes.length;
+            badge.style.display = pendentes.length ? 'inline-flex' : 'none';
+        }
+
+        if (!pendentes.length) {
+            lista.innerHTML = '<p>Nenhum documento pendente.</p>';
+            return;
+        }
+
+        lista.innerHTML = '';
+
+        pendentes.forEach(p => {
+            const div = document.createElement('div');
+            div.className = 'confirmacao';
+            div.id = `pendente-${p.id}`;
+
+            const info = document.createElement('div');
+            info.className = 'confirmacao-info';
+
+            const nome = document.createElement('strong');
+            nome.textContent = p.nome_extraido || 'Nome nao identificado';
+
+            const arq = document.createElement('span');
+            arq.textContent = p.nome_arquivo || 'Arquivo';
+
+            const dt = document.createElement('small');
+            dt.textContent = `${formatarDataHora(p.criado_em)}${p.tipo_detectado ? ' - ' + p.tipo_detectado : ''}`;
+
+            const actions = document.createElement('div');
+            actions.className = 'pendente-actions';
+
+            const btnVincular = document.createElement('button');
+            btnVincular.className = 'btn-download';
+            btnVincular.textContent = 'Vincular';
+            btnVincular.addEventListener('click', () => abrirModalVincular(p));
+
+            const btnCadastrar = document.createElement('button');
+            btnCadastrar.className = 'btn-outline btn-pendente';
+            btnCadastrar.textContent = 'Cadastrar';
+            btnCadastrar.addEventListener('click', () => abrirModalCadastro(p.nome_extraido || ''));
+
+            const btnExcluir = document.createElement('button');
+            btnExcluir.className = 'btn-delete btn-pendente';
+            btnExcluir.textContent = 'Excluir';
+            btnExcluir.addEventListener('click', () => excluirPendente(p.id));
+
+            const btnVisualizar = document.createElement('button');
+            btnVisualizar.className = 'btn-outline btn-pendente';
+            btnVisualizar.textContent = 'Visualizar';
+            btnVisualizar.addEventListener('click', () => visualizarPendente(p.id));
+
+            actions.append(btnVisualizar, btnVincular, btnCadastrar, btnExcluir);
+            info.append(nome, arq, dt);
+            div.append(info, actions);
+            lista.appendChild(div);
+        });
+    } catch(e) {
+        lista.innerHTML = 'Erro ao carregar pendentes.';
+    } finally {
+        if (loading) loading.style.display = 'none';
+    }
+}
+
+let _confirmarCallback = null;
+
+function mostrarModalConfirmar(titulo, msg, callback) {
+    document.getElementById('modal-confirmar-titulo').textContent = titulo;
+    document.getElementById('modal-confirmar-msg').textContent = msg;
+    _confirmarCallback = callback;
+    document.getElementById('modal-confirmar').style.display = 'flex';
+}
+
+function fecharModalConfirmar() {
+    document.getElementById('modal-confirmar').style.display = 'none';
+    _confirmarCallback = null;
+}
+
+document.getElementById('btn-confirmar-sim')?.addEventListener('click', function() {
+    const cb = _confirmarCallback;
+    fecharModalConfirmar();
+    if (cb) cb();
+});
+
+function fecharModalSenha() {
+    document.getElementById('modal-senha').style.display = 'none';
+}
+
+async function excluirPendente(id) {
+    if (!id) return;
+    mostrarModalConfirmar('Excluir Pendente', 'Excluir este documento pendente?', async () => {
+        try {
+            const session = await client.auth.getSession();
+            const token = session.data.session?.access_token;
+            const res = await fetch(`${API_URL}/pendentes/${id}`, {
+                method: 'DELETE',
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            if (!res.ok) {
+                const d = await res.json().catch(() => ({}));
+                alert(d.erro || 'Erro ao excluir pendente.');
+                return;
+            }
+            document.getElementById(`pendente-${id}`)?.remove();
+            carregarMetricasAdmin();
+        } catch (e) {
+            alert('Erro de conexao ao excluir pendente.');
+        }
+    });
+}
+
+async function visualizarPendente(id) {
+    const session = await client.auth.getSession();
+    const token = session.data.session?.access_token;
+    const viewer = document.getElementById('pdf-viewer');
+    const modal = document.getElementById('modal-visualizar-pdf');
+    if (!viewer || !modal) return;
+    viewer.src = `${API_URL}/pendentes/${id}/arquivo?token=${encodeURIComponent(token)}`;
+    modal.style.display = 'flex';
+    document.addEventListener('keydown', fecharVisualizarPdfEsc);
+}
+
+function fecharVisualizarPdfEsc(e) {
+    if (e.key === 'Escape') fecharVisualizarPdf();
+}
+
+function fecharVisualizarPdf() {
+    const viewer = document.getElementById('pdf-viewer');
+    const modal = document.getElementById('modal-visualizar-pdf');
+    if (viewer) viewer.src = '';
+    if (modal) modal.style.display = 'none';
+    document.removeEventListener('keydown', fecharVisualizarPdfEsc);
+}
+
+const _abrirModalVincularBase = abrirModalVincular;
+abrirModalVincular = async function(pendente) {
+    await _abrirModalVincularBase(pendente);
+    document.getElementById('vincular-select-tipo').value = tipoPendenteParaSelect(pendente.tipo_detectado);
+};
+
+document.addEventListener('keydown', function(e) {
+    if (e.key !== 'Escape') return;
+    fecharVisualizarPdf();
+    fecharModalVincular();
+    fecharModalTermos();
+    fecharModalCadastro();
+    fecharModalEditar();
+    fecharModalConfirmar();
+    fecharModalSenha();
+});
+</script>
 </body>
 </html>

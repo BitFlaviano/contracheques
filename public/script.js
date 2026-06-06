@@ -15,6 +15,7 @@ let userIdSelecionado = null;
 let fazendoLogin = false;
 let enviandoArquivo = false;
 let arquivoPendente = null;
+let arquivoBucket = null;
 let confirmandoDownload = false;
 
 
@@ -136,7 +137,7 @@ async function fazerLogin() {
 
 let tempoInatividade;
 let controleSessaoAtivo = false;
-const TEMPO_LIMITE = 5 * 60 * 1000; // 5 minutos
+const TEMPO_LIMITE = 10 * 60 * 1000; // 5 minutos
 
 function resetarTempoSessao() {
 
@@ -208,8 +209,46 @@ function irUploadComprovantes() {
     window.location.href = "upload-comprovantes.html";
 }
 
-function irCadastro() {
+function irCadastro(nomeSugerido = "") {
+    if (document.getElementById("modal-cadastro")) {
+        abrirModalCadastro(nomeSugerido);
+        return;
+    }
+
     window.location.href = "cadastro.html";
+}
+
+function abrirModalCadastro(nomeSugerido = "") {
+    const modal = document.getElementById("modal-cadastro");
+    if (!modal) {
+        window.location.href = "cadastro.html";
+        return;
+    }
+
+    const nome = document.getElementById("nome");
+    const email = document.getElementById("email");
+    const senha = document.getElementById("senha");
+    const cpf = document.getElementById("cpf");
+    const tipo = document.getElementById("tipo");
+    const msg = document.getElementById("msg");
+
+    if (nome) nome.value = String(nomeSugerido || "").toUpperCase();
+    if (email) email.value = "";
+    if (senha) senha.value = "";
+    if (cpf) cpf.value = "";
+    if (tipo) tipo.value = "funcionario";
+    if (msg) {
+        msg.innerText = "";
+        msg.style.color = "";
+    }
+
+    modal.style.display = "flex";
+    setTimeout(() => (nomeSugerido ? email : nome)?.focus(), 50);
+}
+
+function fecharModalCadastro() {
+    const modal = document.getElementById("modal-cadastro");
+    if (modal) modal.style.display = "none";
 }
 
 function irUpload() {
@@ -218,10 +257,6 @@ function irUpload() {
 
 function irUploadPonto() {
     window.location.href = "upload-ponto.html";
-}
-
-function irConfirmacoes() {
-    window.location.href = "confirmacoes.html";
 }
 
 function toggleMenuMobile() {
@@ -254,6 +289,27 @@ function configurarComboAnosSolicitacao() {
 // =============================
 // DASHBOARD USUÁRIO
 // =============================
+async function registrarAcessoPortal() {
+    try {
+        const session = await client.auth.getSession();
+        const token = session.data.session?.access_token;
+        if (!token) return;
+
+        await fetch(`${API_URL}/metricas/acesso`, {
+            method: "POST",
+            headers: {
+                Authorization: `Bearer ${token}`,
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+                caminho: window.location.pathname
+            })
+        });
+    } catch (err) {
+        console.warn("Acesso nao registrado:", err);
+    }
+}
+
 async function carregarDashboard(user) {
 
     const lista = document.getElementById('lista-arquivos');
@@ -310,6 +366,19 @@ async function carregarDashboard(user) {
             folhas,
             "Nenhuma folha de ponto disponível neste mês."
         );
+
+        const badgeCont = document.getElementById('badge-contracheques');
+        if (badgeCont) {
+            const n = (contracheques || []).length;
+            badgeCont.textContent = n;
+            badgeCont.style.display = n ? 'inline-flex' : 'none';
+        }
+        const badgePonto = document.getElementById('badge-ponto');
+        if (badgePonto) {
+            const n = (folhas || []).length;
+            badgePonto.textContent = n;
+            badgePonto.style.display = n ? 'inline-flex' : 'none';
+        }
 
     } catch (err) {
 
@@ -371,51 +440,17 @@ function renderizarListaDocumentos(container, documentos, mensagemVazia) {
             "click",
             async () => {
 
-                // =============================
-                // CONTRACHEQUE
-                // =============================
-                if (
-                    file.tipo === "contracheque"
-                ) {
+                const bucketDocumento =
+                    file.bucket ||
+                    (file.tipo === "folha-ponto"
+                        ? "folhas-ponto"
+                        : file.tipo === "comprovante"
+                            ? "comprovantes"
+                            : "contracheques");
 
-                    // baixa contracheque
-                    await baixarArquivo(
-                        file.caminho
-                    );
-
-                    // monta caminho do comprovante
-                    const comprovante =
-                        file.caminho
-                            .replace(
-                                /^contracheques\//,
-                                ""
-                            );
-
-                    // tenta baixar comprovante
-                    try {
-
-                        await baixarDocumentoDireto(
-                            "comprovantes",
-                            comprovante
-                        );
-
-                    } catch (err) {
-
-                        console.error(
-                            "Comprovante não encontrado:",
-                            err
-                        );
-                    }
-
-                    return;
-                }
-
-                // =============================
-                // OUTROS DOCUMENTOS
-                // =============================
-                await baixarDocumentoDireto(
-                    file.bucket,
-                    file.caminho
+                await baixarArquivo(
+                    file.caminho,
+                    bucketDocumento
                 );
             }
         );
@@ -611,7 +646,7 @@ async function alterarSenha() {
 // =============================
 // BAIXAR ARQUIVO
 // =============================
-async function baixarArquivo(caminho) {
+async function baixarArquivo(caminho, bucket) {
 
     try {
 
@@ -639,11 +674,12 @@ async function baixarArquivo(caminho) {
         const data = await res.json();
 
         if (data.confirmado) {
-            await baixarArquivoConfirmado(caminho);
+            await baixarArquivoConfirmado(caminho, bucket || "contracheques");
             return;
         }
 
         arquivoPendente = caminho;
+        arquivoBucket = bucket || "contracheques";
 
         const modal =
             document.getElementById(
@@ -661,8 +697,8 @@ async function baixarArquivo(caminho) {
     }
 }
 
-async function baixarArquivoConfirmado(caminho) {
-    return baixarDocumentoDireto("contracheques", caminho);
+async function baixarArquivoConfirmado(caminho, bucket) {
+    return baixarDocumentoDireto(bucket || "contracheques", caminho);
 }
 
 async function baixarDocumentoDireto(bucket, caminho) {
@@ -761,7 +797,7 @@ async function confirmarDownload() {
             return;
         }
 
-        const baixou = await baixarArquivoConfirmado(arquivoPendente);
+        const baixou = await baixarArquivoConfirmado(arquivoPendente, arquivoBucket);
 
         if (!baixou) return;
 
@@ -772,6 +808,7 @@ async function confirmarDownload() {
 
         checkbox.checked = false;
         arquivoPendente = null;
+        arquivoBucket = null;
 
         if (typeof carregarConfirmacoes === "function") {
             carregarConfirmacoes();
@@ -796,6 +833,7 @@ function fecharModalTermos() {
     }
 
     arquivoPendente = null;
+    arquivoBucket = null;
     confirmandoDownload = false;
 }
 
@@ -903,11 +941,20 @@ if (!validarCPF(cpfLimpo)) {
             return;
         }
 
+        const session = await client.auth.getSession();
+        const token = session.data.session?.access_token;
+
+        if (!token) {
+            window.location.href = "login.html";
+            return;
+        }
+
         const res = await fetch(`${API_URL}/register`, {
 
             method: "POST",
 
             headers: {
+                Authorization: `Bearer ${token}`,
                 "Content-Type": "application/json"
             },
 
@@ -933,7 +980,15 @@ if (!validarCPF(cpfLimpo)) {
             document.getElementById("email").value = "";
             document.getElementById("senha").value = "";
             document.getElementById("cpf").value = "";
-            document.getElementById("tipo").value = "user";
+            document.getElementById("tipo").value = "funcionario";
+
+            if (typeof carregarUsuarios === "function") carregarUsuarios();
+            if (typeof carregarPendentes === "function") carregarPendentes();
+            if (typeof carregarMetricasAdmin === "function") carregarMetricasAdmin();
+
+            if (document.getElementById("modal-cadastro")) {
+                setTimeout(fecharModalCadastro, 700);
+            }
 
         } else {
 
@@ -1281,10 +1336,17 @@ async function carregarConfirmacoes() {
 // =============================
 async function deletarUsuario(userId) {
 
-    if (!confirm("Deseja excluir este usuário?")) {
-        return;
+    if (typeof mostrarModalConfirmar === 'function') {
+        mostrarModalConfirmar('Excluir Usuário', 'Deseja excluir este usuário?', async () => {
+            await executarDelecaoUsuario(userId);
+        });
+    } else {
+        if (!confirm("Deseja excluir este usuário?")) return;
+        await executarDelecaoUsuario(userId);
     }
+}
 
+async function executarDelecaoUsuario(userId) {
     try {
 
         const session =
@@ -1441,118 +1503,234 @@ async function confirmarAlteracaoCadastro() {
 // =============================
 // UPLOAD PDF
 // =============================
-async function enviarPDF() {
+// async function enviarPDF() {
 
+//     if (enviandoArquivo) return;
+
+//     enviandoArquivo = true;
+
+//     const fileInput = document.getElementById("pdf");
+//     const file = fileInput?.files[0];
+
+//     const msg = document.getElementById("msg");
+//     const loading = document.getElementById("loading");
+
+//     try {
+
+//         if (!file) {
+
+//             msg.innerText = "Selecione um PDF.";
+//             msg.style.color = "red";
+
+//             return;
+//         }
+
+//         if (file.type !== "application/pdf") {
+
+//             msg.innerText =
+//                 "Envie apenas arquivos PDF.";
+
+//             msg.style.color = "red";
+
+//             return;
+//         }
+
+//         if (file.size > 10 * 1024 * 1024) {
+
+//             msg.innerText =
+//                 "Arquivo excede 10MB.";
+
+//             msg.style.color = "red";
+
+//             return;
+//         }
+
+//         const formData = new FormData();
+
+//         formData.append("pdf", file);
+
+//         loading.style.display = "block";
+
+//         msg.innerText = "";
+
+//         const session =
+//             await client.auth.getSession();
+
+//         const token =
+//             session.data.session?.access_token;
+
+//         const res = await fetch("/upload", {
+
+//             method: "POST",
+
+//             headers: {
+//                 Authorization: `Bearer ${token}`
+//             },
+
+//             body: formData
+//         });
+
+//         const data = await res.json();
+
+//         if (res.ok) {
+
+//             msg.innerText =
+//                 "Upload realizado com sucesso.";
+
+//             msg.style.color = "green";
+
+//             fileInput.value = "";
+
+//         } else {
+
+//             msg.innerText =
+//                 data?.erro || "Erro no upload.";
+
+//             msg.style.color = "red";
+//         }
+
+//     } catch (err) {
+
+//         console.error(err);
+
+//         msg.innerText =
+//             "Erro ao conectar ao servidor.";
+
+//         msg.style.color = "red";
+
+//     } finally {
+
+//         enviandoArquivo = false;
+
+//         if (loading) {
+//             loading.style.display = "none";
+//         }
+
+//         setTimeout(() => {
+
+//             if (msg) {
+//                 msg.innerText = "";
+//             }
+
+//         }, 3000);
+//     }
+// }
+
+
+// async function enviarPDF() {
+
+//     const arquivo =
+//         document.getElementById('pdf').files[0];
+
+//     const msg =
+//         document.getElementById('msg');
+
+//     if (!arquivo) {
+//         msg.innerText =
+//             'Selecione um PDF';
+//         return;
+//     }
+
+//     const formData =
+//         new FormData();
+
+//     formData.append(
+//         'pdf',
+//         arquivo
+//     );
+
+//     try {
+
+//         const resposta =
+//             await fetch(
+//                 '/upload-documento',
+//                 {
+//                     method: 'POST',
+//                     body: formData
+//                 }
+//             );
+
+//         const dados =
+//             await resposta.json();
+
+//         if (!resposta.ok) {
+
+//             msg.innerText =
+//                 dados.erro;
+
+//             return;
+//         }
+
+//         msg.innerText =
+//             `Documento processado (${dados.tipo})`;
+
+//     } catch (erro) {
+
+//         console.error(erro);
+
+//         msg.innerText =
+//             'Erro ao enviar documento';
+//     }
+// }
+
+
+async function enviarPDF(arquivo) {
     if (enviandoArquivo) return;
-
     enviandoArquivo = true;
 
-    const fileInput = document.getElementById("pdf");
-    const file = fileInput?.files[0];
-
-    const msg = document.getElementById("msg");
-    const loading = document.getElementById("loading");
-
     try {
+        const fileInput = document.getElementById("pdf");
+        const file = arquivo || fileInput?.files?.[0];
+        const msg = document.getElementById("msg");
+        const loading = document.getElementById("loading");
 
         if (!file) {
-
-            msg.innerText = "Selecione um PDF.";
-            msg.style.color = "red";
-
-            return;
-        }
-
-        if (file.type !== "application/pdf") {
-
-            msg.innerText =
-                "Envie apenas arquivos PDF.";
-
-            msg.style.color = "red";
-
-            return;
-        }
-
-        if (file.size > 10 * 1024 * 1024) {
-
-            msg.innerText =
-                "Arquivo excede 10MB.";
-
-            msg.style.color = "red";
-
+            if (msg) { msg.innerText = "Selecione um PDF."; msg.style.color = "red"; }
             return;
         }
 
         const formData = new FormData();
+        formData.append('pdf', file);
 
-        formData.append("pdf", file);
+        if (loading) loading.style.display = "block";
+        if (msg) msg.innerText = "";
 
-        loading.style.display = "block";
-
-        msg.innerText = "";
-
-        const session =
-            await client.auth.getSession();
-
-        const token =
-            session.data.session?.access_token;
+        const session = await client.auth.getSession();
+        const token = session.data.session?.access_token;
 
         const res = await fetch("/upload", {
-
             method: "POST",
-
-            headers: {
-                Authorization: `Bearer ${token}`
-            },
-
+            headers: { Authorization: `Bearer ${token}` },
             body: formData
         });
 
         const data = await res.json();
 
         if (res.ok) {
-
-            msg.innerText =
-                "Upload realizado com sucesso.";
-
-            msg.style.color = "green";
-
-            fileInput.value = "";
-
-        } else {
-
-            msg.innerText =
-                data?.erro || "Erro no upload.";
-
-            msg.style.color = "red";
-        }
-
-    } catch (err) {
-
-        console.error(err);
-
-        msg.innerText =
-            "Erro ao conectar ao servidor.";
-
-        msg.style.color = "red";
-
-    } finally {
-
-        enviandoArquivo = false;
-
-        if (loading) {
-            loading.style.display = "none";
-        }
-
-        setTimeout(() => {
-
             if (msg) {
-                msg.innerText = "";
+                msg.innerText = "Upload realizado com sucesso.";
+                msg.style.color = "green";
             }
-
-        }, 3000);
+            if (fileInput) fileInput.value = "";
+        } else {
+            if (msg) {
+                msg.innerText = data?.erro || "Erro no upload.";
+                msg.style.color = "red";
+            }
+        }
+    } catch (erro) {
+        console.error(erro);
+        if (document.getElementById("msg")) {
+            document.getElementById("msg").innerText = "Erro ao conectar ao servidor.";
+            document.getElementById("msg").style.color = "red";
+        }
+    } finally {
+        enviandoArquivo = false;
+        const loading = document.getElementById("loading");
+        if (loading) loading.style.display = "none";
     }
 }
+
 
 async function solicitarContrachequeAnterior() {
     const ano = document.getElementById("solicitacao-ano")?.value;
@@ -1878,6 +2056,14 @@ async function baixarAtestadoAdmin(id, nomeArquivo, btn) {
             }
         }
 
+        // atualiza badge de atestados
+        const badgeAtest = document.getElementById('badge-atestados');
+        if (badgeAtest) {
+            const n = Math.max(0, Number(badgeAtest.textContent) - 1);
+            badgeAtest.textContent = n;
+            badgeAtest.style.display = n ? 'inline-flex' : 'none';
+        }
+
         // recarrega confirmações para aparecer lá
         carregarConfirmacoes();
 
@@ -2004,6 +2190,8 @@ document.addEventListener(
             const sessaoAtiva = await iniciarControleSessao();
 
             if (!sessaoAtiva) return;
+
+            registrarAcessoPortal();
 
             // =============================
             // USER
@@ -2157,6 +2345,16 @@ document.addEventListener("keydown", function(event) {
     ) {
         fecharModalTermos();
     }
+
+    const modalCadastro =
+        document.getElementById("modal-cadastro");
+
+    if (
+        modalCadastro &&
+        modalCadastro.style.display === "flex"
+    ) {
+        fecharModalCadastro();
+    }
 });
 
 // ===========================================
@@ -2184,174 +2382,37 @@ async function carregarContrachequesAdmin(user) {
     lista.innerHTML = "";
 
     try {
+        const session = await client.auth.getSession();
+        const token = session.data.session?.access_token;
 
-        const nomeUsuario =
-            user.user_metadata?.full_name || "";
-
-        const nomeNormalizado =
-            nomeUsuario
-                .normalize("NFD")
-                .replace(
-                    /[\u0300-\u036f]/g,
-                    ""
-                )
-                .toUpperCase()
-                .trim();
-
-        let arquivosEncontrados = [];
-
-        // =============================
-        // LISTA PASTAS
-        // =============================
-        const {
-            data: pastas,
-            error: erroPastas
-        } = await client.storage
-            .from("contracheques")
-            .list("", {
-                limit: 100
-            });
-
-        if (erroPastas) {
-
-            console.error(
-                "ERRO STORAGE:",
-                erroPastas
-            );
-
-            lista.innerHTML =
-                "Erro ao acessar storage.";
-
+        if (!token) {
+            window.location.href = "login.html";
             return;
         }
 
-        // =============================
-        // PERCORRE PASTAS
-        // =============================
-        for (const pasta of pastas) {
-
-            const {
-                data: arquivos,
-                error: erroArquivos
-            } = await client.storage
-                .from("contracheques")
-                .list(pasta.name, {
-                    limit: 100
-                });
-
-            if (erroArquivos) {
-
-                console.error(
-                    "ERRO ARQUIVOS:",
-                    erroArquivos
-                );
-
-                continue;
-            }
-
-            if (!arquivos) continue;
-
-            arquivos.forEach(file => {
-
-                const nomeArquivo =
-                    file.name
-                        .normalize("NFD")
-                        .replace(
-                            /[\u0300-\u036f]/g,
-                            ""
-                        )
-                        .toUpperCase()
-                        .trim();
-
-                // ADMIN vê apenas os próprios
-                if (
-                    nomeArquivo.includes(
-                        nomeNormalizado
-                    )
-                ) {
-
-                    arquivosEncontrados.push({
-                        nome: file.name,
-                        caminho:
-                            `${pasta.name}/${file.name}`
-                    });
-                }
-            });
-        }
-
-        // =============================
-        // SEM ARQUIVOS
-        // =============================
-        if (
-            arquivosEncontrados.length === 0
-        ) {
-
-            lista.innerHTML =
-                "Nenhum contracheque encontrado.";
-
-            return;
-        }
-
-        // =============================
-        // RENDERIZA
-        // =============================
-        arquivosEncontrados.forEach(file => {
-
-            const div =
-                document.createElement("div");
-
-            div.className =
-                "documento";
-
-            // evita innerHTML inseguro
-            const span =
-                document.createElement("span");
-
-            span.textContent =
-                file.nome;
-
-            const botao =
-                document.createElement("button");
-
-            botao.className =
-                "btn-download";
-
-            botao.textContent =
-                "Baixar";
-
-            botao.addEventListener(
-                "click",
-                () => {
-                    baixarArquivo(
-                        file.caminho
-                    );
-                }
-            );
-
-            div.appendChild(span);
-            div.appendChild(botao);
-
-            lista.appendChild(div);
+        const res = await fetch(`${API_URL}/documentos?tipo=contracheque`, {
+            headers: { Authorization: `Bearer ${token}` }
         });
 
-    } catch (err) {
+        const documentos = res.ok ? await res.json() : [];
 
-        console.error(
-            "ERRO GERAL:",
-            err
+        renderizarListaDocumentos(
+            lista,
+            documentos,
+            "Nenhum contracheque encontrado."
         );
 
-        lista.innerHTML =
-            "Erro inesperado.";
-
+        return;
+    } catch (err) {
+        console.error("ERRO CONTRACHEQUES ADMIN:", err);
+        lista.innerHTML = "Erro ao carregar contracheques.";
     } finally {
-
         if (loading) {
-            loading.style.display =
-                "none";
+            loading.style.display = "none";
         }
     }
 }
+
 
 // ===========================================
 // CARREGAR COMPROVANTES
@@ -2434,9 +2495,9 @@ async function carregarComprovantes(user) {
                 "click",
                 () => {
 
-                    baixarDocumentoDireto(
-                        file.bucket,
-                        file.caminho
+                    baixarArquivo(
+                        file.caminho,
+                        file.bucket || "comprovantes"
                     );
                 }
             );
@@ -2446,6 +2507,13 @@ async function carregarComprovantes(user) {
 
             lista.appendChild(div);
         });
+
+        const badgeComp = document.getElementById('badge-comprovantes');
+        if (badgeComp) {
+            const n = (comprovantes || []).length;
+            badgeComp.textContent = n;
+            badgeComp.style.display = n ? 'inline-flex' : 'none';
+        }
 
     } catch (err) {
 
