@@ -52,8 +52,10 @@
     </nav>
 
     <div class="sidebar-footer">
-        <div class="sidebar-user-info">
-            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+        <div class="sidebar-user-info" onclick="abrirModalMeusDados()" style="cursor:pointer;">
+            <span class="sidebar-avatar" id="avatar-sidebar-user">
+                <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+            </span>
             <span id="nome-usuario">Carregando...</span>
         </div>
         <button class="btn-logout-sidebar" onclick="fazerLogout()">
@@ -165,6 +167,58 @@
     </div>
 </div>
 
+<div id="modal-meus-dados" class="modal" style="display:none;">
+    <div class="modal-content">
+        <h3>Meus Dados</h3>
+        <div style="display:flex;flex-direction:column;gap:12px;">
+            <div style="display:flex;align-items:center;gap:16px;">
+                <div id="avatar-preview-user" style="width:64px;height:64px;border-radius:50%;background:#e5e7eb;display:flex;align-items:center;justify-content:center;overflow:hidden;flex-shrink:0;">
+                    <svg width="28" height="28" fill="none" stroke="#9ca3af" stroke-width="2" viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                </div>
+                <div>
+                    <strong id="meus-dados-nome" style="font-size:16px;">—</strong>
+                    <br>
+                    <small id="meus-dados-email" style="color:#6b7280;">—</small>
+                </div>
+            </div>
+            <label>CPF</label>
+            <input type="text" id="meus-dados-cpf" readonly style="background:#f3f4f6;">
+            <label>Empresa</label>
+            <input type="text" id="meus-dados-empresa" readonly style="background:#f3f4f6;">
+            <label>Endereço</label>
+            <input type="text" id="meus-dados-endereco" placeholder="Ex: Rua Exemplo, 123">
+            <label>Foto do Perfil</label>
+            <input type="file" id="meus-dados-foto" accept="image/*">
+            <p id="msg-meus-dados" style="font-size:13px;min-height:18px;color:#4b5563;"></p>
+            <div style="display:flex;gap:10px;">
+                <button onclick="salvarMeusDados()">Salvar</button>
+                <button onclick="fecharModalMeusDados()" style="background:#6c757d;">Fechar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL CORTE DE FOTO -->
+<div id="modal-corte-foto" class="modal" style="display:none;">
+    <div class="modal-content" style="width:400px;">
+        <h3>Ajustar Foto</h3>
+        <div style="position:relative;width:280px;height:280px;margin:12px auto;border-radius:50%;overflow:hidden;cursor:grab;background:#f3f4f6;" id="crop-container">
+            <canvas id="crop-canvas" width="280" height="280"></canvas>
+        </div>
+        <div style="display:flex;align-items:center;justify-content:center;gap:12px;margin-bottom:8px;">
+            <button onclick="zoomCorte(-0.1)" style="width:36px;height:36px;padding:0;font-size:18px;font-weight:bold;border:1px solid #d1d5db;border-radius:50%;background:#fff;cursor:pointer;">−</button>
+            <span id="zoom-indicator" style="font-size:13px;color:#6b7280;min-width:40px;text-align:center;">100%</span>
+            <button onclick="zoomCorte(0.1)" style="width:36px;height:36px;padding:0;font-size:18px;font-weight:bold;border:1px solid #d1d5db;border-radius:50%;background:#fff;cursor:pointer;">+</button>
+        </div>
+        <p style="font-size:13px;color:#6b7280;text-align:center;">Arraste para posicionar | +/− para zoom</p>
+        <p id="msg-corte" style="font-size:13px;min-height:18px;color:#4b5563;"></p>
+        <div style="display:flex;gap:10px;justify-content:center;">
+            <button onclick="confirmarCorte()">Confirmar</button>
+            <button onclick="cancelarCorte()" style="background:#6c757d;">Cancelar</button>
+        </div>
+    </div>
+</div>
+
 <footer class="site-footer">&copy; Flaviano Porto 2026</footer>
 <script src="script.js"></script>
 <script>
@@ -194,6 +248,311 @@ document.addEventListener('keydown', function(e) {
     if (e.key === 'Escape') {
         const modal = document.getElementById('modal-termos');
         if (modal && modal.style.display === 'flex') fecharModalTermos();
+        const modal2 = document.getElementById('modal-meus-dados');
+        if (modal2 && modal2.style.display === 'flex') fecharModalMeusDados();
+        const modal3 = document.getElementById('modal-corte-foto');
+        if (modal3 && modal3.style.display === 'flex') cancelarCorte();
+    }
+});
+
+// =============================
+// MEUS DADOS + CORTE DE FOTO
+// =============================
+let _meusDadosUser = null;
+let _corteCanvas = null;
+let _corteCtx = null;
+let _corteImg = null;
+let _corteOffsetX = 0;
+let _corteOffsetY = 0;
+let _corteDragging = false;
+let _corteStartX = 0;
+let _corteStartY = 0;
+let _corteBlob = null;
+let _corteScale = 1;
+let _corteZoom = 1;
+
+function abrirModalMeusDados() {
+    const user = _meusDadosUser;
+    if (!user) return;
+    document.getElementById('meus-dados-nome').textContent = user.user_metadata?.full_name || '—';
+    document.getElementById('meus-dados-email').textContent = user.email || '—';
+    document.getElementById('meus-dados-cpf').value = user.user_metadata?.cpf || '—';
+
+    const empresaInput = document.getElementById('meus-dados-empresa');
+    if (empresaInput) empresaInput.value = user.user_metadata?.empresa || '';
+
+    const enderecoInput = document.getElementById('meus-dados-endereco');
+    if (enderecoInput) enderecoInput.value = user.user_metadata?.endereco || '';
+
+    const fotoUrl = user.user_metadata?.foto_url;
+    const preview = document.getElementById('avatar-preview-user');
+    if (preview) {
+        if (fotoUrl) {
+            preview.innerHTML = `<img src="${fotoUrl}" style="width:100%;height:100%;object-fit:cover;">`;
+        } else {
+            preview.innerHTML = `<svg width="28" height="28" fill="none" stroke="#9ca3af" stroke-width="2" viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>`;
+        }
+    }
+
+    _corteBlob = null;
+    document.getElementById('meus-dados-foto').value = '';
+
+    document.getElementById('msg-meus-dados').textContent = '';
+    document.getElementById('modal-meus-dados').style.display = 'flex';
+}
+
+function fecharModalMeusDados() {
+    document.getElementById('modal-meus-dados').style.display = 'none';
+}
+
+// foto selecionada -> abrir modal de corte
+document.addEventListener('DOMContentLoaded', () => {
+    const fotoInput = document.getElementById('meus-dados-foto');
+    if (fotoInput) {
+        fotoInput.addEventListener('change', function() {
+            if (!this.files?.length) return;
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                iniciarCorte(e.target.result);
+            };
+            reader.readAsDataURL(this.files[0]);
+        });
+    }
+    const container = document.getElementById('crop-container');
+    if (container) {
+        container.addEventListener('mousedown', iniciarArraste);
+        container.addEventListener('mousemove', arrastar);
+        container.addEventListener('mouseup', pararArraste);
+        container.addEventListener('mouseleave', pararArraste);
+        container.addEventListener('touchstart', function(e) {
+            const touch = e.touches[0];
+            iniciarArraste({ clientX: touch.clientX, clientY: touch.clientY, preventDefault: () => e.preventDefault() });
+        });
+        container.addEventListener('touchmove', function(e) {
+            const touch = e.touches[0];
+            arrastar({ clientX: touch.clientX, clientY: touch.clientY, preventDefault: () => e.preventDefault() });
+        });
+        container.addEventListener('touchend', pararArraste);
+    }
+});
+
+function iniciarCorte(dataUrl) {
+    const img = new Image();
+    img.onload = function() {
+        _corteImg = img;
+        _corteCanvas = document.getElementById('crop-canvas');
+        _corteCtx = _corteCanvas.getContext('2d');
+        _corteOffsetX = 0;
+        _corteOffsetY = 0;
+        _corteBlob = null;
+        _corteZoom = 1;
+        const canvasSize = 280;
+        _corteScale = Math.min(canvasSize / img.width, canvasSize / img.height);
+        desenharCorte();
+        document.getElementById('zoom-indicator').textContent = '100%';
+        document.getElementById('modal-corte-foto').style.display = 'flex';
+    };
+    img.src = dataUrl;
+}
+
+function desenharCorte() {
+    const ctx = _corteCtx;
+    const canvas = _corteCanvas;
+    if (!ctx || !_corteImg) return;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(canvas.width / 2, canvas.height / 2, canvas.width / 2, 0, Math.PI * 2);
+    ctx.clip();
+    const sw = _corteImg.width * _corteScale * _corteZoom;
+    const sh = _corteImg.height * _corteScale * _corteZoom;
+    const sx = (canvas.width - sw) / 2 + _corteOffsetX;
+    const sy = (canvas.height - sh) / 2 + _corteOffsetY;
+    ctx.drawImage(_corteImg, sx, sy, sw, sh);
+    ctx.restore();
+}
+
+function iniciarArraste(e) {
+    if (!_corteImg) return;
+    _corteDragging = true;
+    _corteStartX = e.clientX - _corteOffsetX;
+    _corteStartY = e.clientY - _corteOffsetY;
+    if (e.target) e.target.style.cursor = 'grabbing';
+    if (e.preventDefault) e.preventDefault();
+}
+
+function arrastar(e) {
+    if (!_corteDragging || !_corteImg) return;
+    _corteOffsetX = e.clientX - _corteStartX;
+    _corteOffsetY = e.clientY - _corteStartY;
+    desenharCorte();
+    if (e.preventDefault) e.preventDefault();
+}
+
+function pararArraste() {
+    if (!_corteDragging) return;
+    _corteDragging = false;
+    const container = document.getElementById('crop-container');
+    if (container) container.style.cursor = 'grab';
+}
+
+function zoomCorte(delta) {
+    if (!_corteImg) return;
+    _corteZoom = Math.max(0.5, Math.min(5, _corteZoom + delta));
+    document.getElementById('zoom-indicator').textContent = Math.round(_corteZoom * 100) + '%';
+    desenharCorte();
+}
+
+function confirmarCorte() {
+    const canvas = _corteCanvas;
+    const ctx = _corteCtx;
+    if (!ctx || !_corteImg) return;
+    const outCanvas = document.createElement('canvas');
+    outCanvas.width = 200;
+    outCanvas.height = 200;
+    const outCtx = outCanvas.getContext('2d');
+    outCtx.save();
+    outCtx.beginPath();
+    outCtx.arc(100, 100, 100, 0, Math.PI * 2);
+    outCtx.clip();
+    outCtx.drawImage(canvas, 0, 0, 200, 200);
+    outCtx.restore();
+    outCanvas.toBlob(function(blob) {
+        _corteBlob = blob;
+        const previewUrl = URL.createObjectURL(blob);
+        const preview = document.getElementById('avatar-preview-user');
+        if (preview) preview.innerHTML = `<img src="${previewUrl}" style="width:100%;height:100%;object-fit:cover;">`;
+        document.getElementById('msg-corte').textContent = '';
+        document.getElementById('modal-corte-foto').style.display = 'none';
+    }, 'image/jpeg', 0.9);
+}
+
+function cancelarCorte() {
+    _corteBlob = null;
+    _corteImg = null;
+    document.getElementById('meus-dados-foto').value = '';
+    document.getElementById('msg-corte').textContent = '';
+    document.getElementById('modal-corte-foto').style.display = 'none';
+}
+
+async function salvarMeusDados() {
+    const msg = document.getElementById('msg-meus-dados');
+    const user = _meusDadosUser;
+    if (!user) { msg.textContent = 'Erro: usuário não carregado.'; return; }
+
+    const endereco = document.getElementById('meus-dados-endereco')?.value?.trim() || '';
+
+    try {
+        const session = await client.auth.getSession();
+        const token = session.data.session?.access_token;
+        if (!token) { msg.textContent = 'Sessão expirada.'; return; }
+
+        msg.textContent = 'Salvando...';
+
+        if (_corteBlob) {
+            const formData = new FormData();
+            formData.append('foto', _corteBlob, 'foto_perfil.jpg');
+            const fotoRes = await fetch(`${API_URL}/users/${user.id}/foto`, {
+                method: 'POST',
+                headers: { Authorization: `Bearer ${token}` },
+                body: formData
+            });
+            if (!fotoRes.ok) {
+                const fotoErr = await fotoRes.json().catch(() => ({}));
+                msg.textContent = fotoErr.erro || 'Erro ao enviar foto.';
+                return;
+            }
+            const fotoData = await fotoRes.json();
+            if (fotoData.url) {
+                _meusDadosUser.user_metadata.foto_url = fotoData.url;
+                const preview = document.getElementById('avatar-preview-user');
+                if (preview) preview.innerHTML = `<img src="${fotoData.url}" style="width:100%;height:100%;object-fit:cover;">`;
+                const sidebarAvatar = document.getElementById('avatar-sidebar-user');
+                if (sidebarAvatar) sidebarAvatar.innerHTML = `<img src="${fotoData.url}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">`;
+            }
+        }
+
+        const res = await fetch(`${API_URL}/users/${user.id}/dados`, {
+            method: 'PUT',
+            headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ endereco })
+        });
+        if (!res.ok) {
+            const d = await res.json().catch(() => ({}));
+            msg.textContent = d.erro || 'Erro ao salvar.';
+            return;
+        }
+        const data = await res.json();
+        if (data.user_metadata) {
+            _meusDadosUser.user_metadata = { ..._meusDadosUser.user_metadata, ...data.user_metadata };
+        }
+        msg.textContent = 'Dados salvos com sucesso!';
+        msg.style.color = '#166534';
+    } catch (e) {
+        msg.textContent = 'Erro de conexão.';
+    }
+}
+
+// =============================
+// NOTIFICAÇÕES
+// =============================
+function solicitarPermissaoNotificacao() {
+    if (!('Notification' in window)) return;
+    if (Notification.permission === 'default') {
+        Notification.requestPermission();
+    }
+}
+
+function mostrarNotificacao(titulo, corpo) {
+    if (!('Notification' in window)) return;
+    if (Notification.permission === 'granted') {
+        new Notification(titulo, { body: corpo, icon: 'https://kidverte.vteximg.com.br/arquivos/kidvert-favicon.ico?v=636445463116770000' });
+    }
+}
+
+// notificar quando badge aparecer
+const _badgeObserverUser = new MutationObserver(() => {
+    const badges = ['badge-contracheques', 'badge-comprovantes', 'badge-ponto'];
+    const algumNovo = badges.some(id => {
+        const el = document.getElementById(id);
+        return el && el.style.display !== 'none' && Number(el.textContent) > 0;
+    });
+    if (algumNovo) {
+        mostrarNotificacao('Kidverte RH', 'Há algo de novo!');
+    }
+});
+
+document.addEventListener('DOMContentLoaded', async () => {
+    // carrega dados do usuário
+    try {
+        const session = await client.auth.getSession();
+        if (session.data.session?.user) {
+            _meusDadosUser = session.data.session.user;
+            const nomeEl = document.getElementById('nome-usuario');
+            if (nomeEl) {
+                nomeEl.textContent = _meusDadosUser.user_metadata?.full_name || 'Colaborador';
+            }
+            const fotoUrl = _meusDadosUser.user_metadata?.foto_url;
+            const sidebarAvatar = document.getElementById('avatar-sidebar-user');
+            if (sidebarAvatar && fotoUrl) {
+                sidebarAvatar.innerHTML = `<img src="${fotoUrl}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">`;
+            }
+        }
+    } catch(e) {}
+
+    solicitarPermissaoNotificacao();
+    ['badge-contracheques', 'badge-comprovantes', 'badge-ponto'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) _badgeObserverUser.observe(el, { attributes: true, childList: true, characterData: true, subtree: true });
+    });
+
+    // shadow na topbar ao scroll (mobile)
+    const topbar = document.querySelector('.topbar');
+    const mainContent = document.querySelector('.main-content');
+    if (topbar && mainContent) {
+        mainContent.addEventListener('scroll', () => {
+            topbar.style.boxShadow = mainContent.scrollTop > 10 ? '0 2px 8px rgba(0,0,0,0.1)' : 'none';
+        });
     }
 });
 </script>

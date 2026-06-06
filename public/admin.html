@@ -43,6 +43,10 @@
             <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
             Upload
         </a>
+        <a href="#" class="nav-item" onclick="irSecao('empresas',this)">
+            <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="2" y="7" width="20" height="14" rx="2" ry="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>
+            Empresas
+        </a>
         <a href="#" class="nav-item" onclick="irSecao('confirmacoes',this)">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
             Confirmações
@@ -61,8 +65,10 @@
     </nav>
 
     <div class="sidebar-footer">
-        <div class="sidebar-user-info">
-            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+        <div class="sidebar-user-info" onclick="abrirModalMeusDados()" style="cursor:pointer;">
+            <span class="sidebar-avatar" id="avatar-sidebar-admin">
+                <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+            </span>
             <span id="nome-usuario-sidebar">—</span>
         </div>
         <button class="btn-logout-sidebar" onclick="fazerLogout()">
@@ -303,6 +309,24 @@
         </div>
     </section>
 
+    <!-- SECAO EMPRESAS -->
+    <section class="secao" id="secao-empresas">
+        <div class="page-header">
+            <div>
+                <h2>Empresas</h2>
+                <p class="page-subtitle">Cadastro de empresas do sistema</p>
+            </div>
+            <button class="btn-primary" onclick="abrirModalEmpresa()">
+                <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                Nova Empresa
+            </button>
+        </div>
+        <div class="card">
+            <div id="loading-empresas" style="display:none;"><div class="dots"></div></div>
+            <div id="lista-empresas"></div>
+        </div>
+    </section>
+
 </main>
 
 <!-- MODAIS -->
@@ -320,28 +344,44 @@
 </div>
 
 <div id="modal-editar" style="display:none;" class="modal">
-    <div class="modal-content">
-        <h3>Alterar Cadastro</h3>
-        <input type="email" id="edit-email" placeholder="Novo email">
-        <input type="password" id="edit-senha" placeholder="Nova senha (opcional)">
-        <p id="msg-editar"></p>
-        <button onclick="confirmarAlteracaoCadastro()">Salvar</button>
-        <button onclick="fecharModalEditar()">Cancelar</button>
+    <div class="modal-content" style="text-align:center;">
+        <div id="edit-foto-display" style="width:calc(80% - 40px);max-width:220px;aspect-ratio:1;border-radius:50%;background:#e5e7eb;margin:10px auto;display:flex;align-items:center;justify-content:center;overflow:hidden;"><svg width="60" height="60" fill="none" stroke="#9ca3af" stroke-width="1.5" viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></div>
+        <p id="edit-nome-display" style="font-size:1.6rem;font-weight:700;margin:8px 0 4px;color:#111827;">Nome</p>
+        <h3 style="text-align:left;margin:0 0 18px;">Alterar Cadastro</h3>
+        <div style="text-align:left;">
+            <input type="email" id="edit-email" placeholder="Novo email" oninput="this.value = this.value.toLowerCase()">
+            <div style="height:8px;"></div>
+            <input type="password" id="edit-senha" placeholder="Nova senha (opcional)">
+            <div style="height:8px;"></div>
+            <select id="edit-tipo">
+                <option value="funcionario">Funcionario</option>
+                <option value="user">Usuario</option>
+                <option value="admin">Admin</option>
+            </select>
+            <div style="height:8px;"></div>
+            <select id="edit-empresa"><option value="">Sem empresa</option></select>
+            <p id="msg-editar" style="margin-top:10px;"></p>
+            <div style="display:flex;gap:12px;margin-top:16px;">
+                <button onclick="confirmarAlteracaoCadastro()" style="flex:1;">Salvar</button>
+                <button onclick="fecharModalEditar()" style="flex:1;background:#6c757d;">Cancelar</button>
+            </div>
+        </div>
     </div>
 </div>
 
 <div id="modal-cadastro" style="display:none;" class="modal">
     <div class="modal-content modal-content-cadastro">
         <h3>Cadastrar Funcionario</h3>
-        <input type="text" id="nome" placeholder="Nome completo">
-        <input type="email" id="email" placeholder="Email">
+        <input type="text" id="nome" placeholder="Nome completo" oninput="this.value = this.value.toUpperCase()">
+        <input type="email" id="email" placeholder="Email" oninput="this.value = this.value.toLowerCase()">
         <input type="password" id="senha" placeholder="Senha provisoria">
-        <input type="text" id="cpf" placeholder="CPF">
+        <input type="text" id="cpf" placeholder="CPF" oninput="this.value = this.value.replace(/\D/g, '')">
         <select id="tipo">
             <option value="funcionario">Funcionario</option>
             <option value="user">Usuario</option>
             <option value="admin">Admin</option>
         </select>
+        <select id="empresa"><option value="">Sem empresa</option></select>
         <p id="msg" style="font-size:13px;min-height:18px;"></p>
         <div class="modal-actions">
             <button onclick="cadastrar()">Cadastrar</button>
@@ -403,6 +443,72 @@
     </div>
 </div>
 
+<div id="modal-meus-dados" class="modal" style="display:none;">
+    <div class="modal-content">
+        <h3>Meus Dados</h3>
+        <div style="display:flex;flex-direction:column;gap:12px;">
+            <div style="display:flex;align-items:center;gap:16px;">
+                <div id="avatar-preview-admin" style="width:64px;height:64px;border-radius:50%;background:#e5e7eb;display:flex;align-items:center;justify-content:center;overflow:hidden;flex-shrink:0;">
+                    <svg width="28" height="28" fill="none" stroke="#9ca3af" stroke-width="2" viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                </div>
+                <div>
+                    <strong id="meus-dados-nome" style="font-size:16px;">—</strong>
+                    <br>
+                    <small id="meus-dados-email" style="color:#6b7280;">—</small>
+                </div>
+            </div>
+            <label>CPF</label>
+            <input type="text" id="meus-dados-cpf" readonly style="background:#f3f4f6;">
+            <label>Empresa</label>
+            <input type="text" id="meus-dados-empresa" readonly style="background:#f3f4f6;">
+            <label>Endereço</label>
+            <input type="text" id="meus-dados-endereco" placeholder="Ex: Rua Exemplo, 123">
+            <label>Foto do Perfil</label>
+            <input type="file" id="meus-dados-foto" accept="image/*">
+            <p id="msg-meus-dados" style="font-size:13px;min-height:18px;color:#4b5563;"></p>
+            <div style="display:flex;gap:10px;">
+                <button onclick="salvarMeusDados()">Salvar</button>
+                <button onclick="fecharModalMeusDados()" style="background:#6c757d;">Fechar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL CORTE DE FOTO -->
+<div id="modal-corte-foto" class="modal" style="display:none;">
+    <div class="modal-content" style="width:400px;">
+        <h3>Ajustar Foto</h3>
+        <div style="position:relative;width:280px;height:280px;margin:12px auto;border-radius:50%;overflow:hidden;cursor:grab;background:#f3f4f6;" id="crop-container">
+            <canvas id="crop-canvas" width="280" height="280"></canvas>
+        </div>
+        <div style="display:flex;align-items:center;justify-content:center;gap:12px;margin-bottom:8px;">
+            <button onclick="zoomCorte(-0.1)" style="width:36px;height:36px;padding:0;font-size:18px;font-weight:bold;border:1px solid #d1d5db;border-radius:50%;background:#fff;cursor:pointer;">−</button>
+            <span id="zoom-indicator" style="font-size:13px;color:#6b7280;min-width:40px;text-align:center;">100%</span>
+            <button onclick="zoomCorte(0.1)" style="width:36px;height:36px;padding:0;font-size:18px;font-weight:bold;border:1px solid #d1d5db;border-radius:50%;background:#fff;cursor:pointer;">+</button>
+        </div>
+        <p style="font-size:13px;color:#6b7280;text-align:center;">Arraste para posicionar | +/− para zoom</p>
+        <p id="msg-corte" style="font-size:13px;min-height:18px;color:#4b5563;"></p>
+        <div style="display:flex;gap:10px;justify-content:center;">
+            <button onclick="confirmarCorte()">Confirmar</button>
+            <button onclick="cancelarCorte()" style="background:#6c757d;">Cancelar</button>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL EMPRESA -->
+<div id="modal-empresa" class="modal" style="display:none;">
+    <div class="modal-content">
+        <h3>Cadastrar Empresa</h3>
+        <input type="text" id="empresa-razao" placeholder="Razão social" oninput="this.value = this.value.toUpperCase()">
+        <input type="text" id="empresa-cnpj" placeholder="CNPJ (apenas números)" oninput="this.value = this.value.replace(/\D/g, '')">
+        <p id="msg-empresa" style="font-size:13px;min-height:18px;"></p>
+        <div style="display:flex;gap:10px;">
+            <button onclick="salvarEmpresa()">Salvar</button>
+            <button onclick="fecharModalEmpresa()" style="background:#6c757d;">Cancelar</button>
+        </div>
+    </div>
+</div>
+
 <footer class="site-footer">&copy; Flaviano Porto 2026</footer>
 <script src="/supabase.js"></script>
 <script src="script.js"></script>
@@ -456,6 +562,9 @@ function irSecao(nome, el) {
         _contrachequesAdminCarregado = true;
         carregarContrachequesAdmin();
     }
+    if (nome === 'empresas') {
+        carregarEmpresas();
+    }
 }
 
 function abrirSidebar() {
@@ -474,10 +583,39 @@ const _nomeObserver = new MutationObserver(() => {
     const t = document.getElementById('nome-usuario')?.textContent?.trim();
     if (t) document.getElementById('nome-usuario-sidebar').textContent = t;
 });
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
     const el = document.getElementById('nome-usuario');
     if (el) _nomeObserver.observe(el, { childList: true, subtree: true, characterData: true });
     carregarEstatisticas();
+
+    // carrega dados do usuário logado para "Meus Dados"
+    try {
+        const session = await client.auth.getSession();
+        if (session.data.session?.user) {
+            _meusDadosUser = session.data.session.user;
+            const fotoUrl = _meusDadosUser.user_metadata?.foto_url;
+            const sidebarAvatar = document.getElementById('avatar-sidebar-admin');
+            if (sidebarAvatar && fotoUrl) {
+                sidebarAvatar.innerHTML = `<img src="${fotoUrl}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">`;
+            }
+        }
+    } catch(e) {}
+
+    solicitarPermissaoNotificacao();
+    const badges = ['badge-pendentes', 'badge-atestados', 'badge-confirmacoes'];
+    badges.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) _badgeObserver.observe(el, { attributes: true, childList: true, characterData: true, subtree: true });
+    });
+
+    // shadow na topbar ao scroll (mobile)
+    const topbar = document.querySelector('.topbar');
+    const mainContent = document.querySelector('.main-content');
+    if (topbar && mainContent) {
+        mainContent.addEventListener('scroll', () => {
+            topbar.style.boxShadow = mainContent.scrollTop > 10 ? '0 2px 8px rgba(0,0,0,0.1)' : 'none';
+        });
+    }
 });
 
 // =============================================
@@ -1088,6 +1226,10 @@ async function carregarPendentes() {
             const dt = document.createElement('small');
             dt.textContent = `${formatarDataHora(p.criado_em)}${p.tipo_detectado ? ' - ' + p.tipo_detectado : ''}`;
 
+            const cpfSpan = document.createElement('div');
+            cpfSpan.style.cssText = 'font-size:12px;color:#6b7280;';
+            cpfSpan.textContent = p.cpf_extraido ? `CPF: ${p.cpf_extraido}` : '';
+
             const actions = document.createElement('div');
             actions.className = 'pendente-actions';
 
@@ -1099,7 +1241,7 @@ async function carregarPendentes() {
             const btnCadastrar = document.createElement('button');
             btnCadastrar.className = 'btn-outline btn-pendente';
             btnCadastrar.textContent = 'Cadastrar';
-            btnCadastrar.addEventListener('click', () => abrirModalCadastro(p.nome_extraido || ''));
+            btnCadastrar.addEventListener('click', () => abrirModalCadastro(p.nome_extraido || '', p.cpf_extraido || ''));
 
             const btnExcluir = document.createElement('button');
             btnExcluir.className = 'btn-delete btn-pendente';
@@ -1112,7 +1254,7 @@ async function carregarPendentes() {
             btnVisualizar.addEventListener('click', () => visualizarPendente(p.id));
 
             actions.append(btnVisualizar, btnVincular, btnCadastrar, btnExcluir);
-            info.append(nome, arq, dt);
+            info.append(nome, arq, dt, cpfSpan);
             div.append(info, actions);
             lista.appendChild(div);
         });
@@ -1199,6 +1341,365 @@ abrirModalVincular = async function(pendente) {
     document.getElementById('vincular-select-tipo').value = tipoPendenteParaSelect(pendente.tipo_detectado);
 };
 
+// =============================
+// MEUS DADOS + CORTE DE FOTO
+// =============================
+let _meusDadosUser = null;
+let _corteCanvas = null;
+let _corteCtx = null;
+let _corteImg = null;
+let _corteOffsetX = 0;
+let _corteOffsetY = 0;
+let _corteDragging = false;
+let _corteStartX = 0;
+let _corteStartY = 0;
+let _corteBlob = null;
+let _corteScale = 1;
+let _corteZoom = 1;
+
+function abrirModalMeusDados() {
+    const user = _meusDadosUser;
+    if (!user) return;
+    document.getElementById('meus-dados-nome').textContent = user.user_metadata?.full_name || '—';
+    document.getElementById('meus-dados-email').textContent = user.email || '—';
+    document.getElementById('meus-dados-cpf').value = user.user_metadata?.cpf || '—';
+    const empresaInput = document.getElementById('meus-dados-empresa');
+    if (empresaInput) empresaInput.value = user.user_metadata?.empresa || '';
+    const enderecoInput = document.getElementById('meus-dados-endereco');
+    if (enderecoInput) enderecoInput.value = user.user_metadata?.endereco || '';
+    const fotoUrl = user.user_metadata?.foto_url;
+    const preview = document.getElementById('avatar-preview-admin');
+    if (preview) {
+        if (fotoUrl) {
+            preview.innerHTML = `<img src="${fotoUrl}" style="width:100%;height:100%;object-fit:cover;">`;
+        } else {
+            preview.innerHTML = `<svg width="28" height="28" fill="none" stroke="#9ca3af" stroke-width="2" viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>`;
+        }
+    }
+    _corteBlob = null;
+    document.getElementById('meus-dados-foto').value = '';
+    document.getElementById('msg-meus-dados').textContent = '';
+    document.getElementById('modal-meus-dados').style.display = 'flex';
+}
+
+function fecharModalMeusDados() {
+    document.getElementById('modal-meus-dados').style.display = 'none';
+}
+
+function iniciarCorte(dataUrl) {
+    const img = new Image();
+    img.onload = function() {
+        _corteImg = img;
+        _corteCanvas = document.getElementById('crop-canvas');
+        _corteCtx = _corteCanvas.getContext('2d');
+        _corteOffsetX = 0;
+        _corteOffsetY = 0;
+        _corteBlob = null;
+        _corteZoom = 1;
+        _corteScale = Math.min(280 / img.width, 280 / img.height);
+        desenharCorte();
+        document.getElementById('zoom-indicator').textContent = '100%';
+        document.getElementById('modal-corte-foto').style.display = 'flex';
+    };
+    img.src = dataUrl;
+}
+
+function desenharCorte() {
+    const ctx = _corteCtx;
+    const canvas = _corteCanvas;
+    if (!ctx || !_corteImg) return;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(canvas.width / 2, canvas.height / 2, canvas.width / 2, 0, Math.PI * 2);
+    ctx.clip();
+    const sw = _corteImg.width * _corteScale * _corteZoom;
+    const sh = _corteImg.height * _corteScale * _corteZoom;
+    const sx = (canvas.width - sw) / 2 + _corteOffsetX;
+    const sy = (canvas.height - sh) / 2 + _corteOffsetY;
+    ctx.drawImage(_corteImg, sx, sy, sw, sh);
+    ctx.restore();
+}
+
+function zoomCorte(delta) {
+    if (!_corteImg) return;
+    _corteZoom = Math.max(0.5, Math.min(5, _corteZoom + delta));
+    document.getElementById('zoom-indicator').textContent = Math.round(_corteZoom * 100) + '%';
+    desenharCorte();
+}
+
+function iniciarArraste(e) {
+    if (!_corteImg) return;
+    _corteDragging = true;
+    _corteStartX = e.clientX - _corteOffsetX;
+    _corteStartY = e.clientY - _corteOffsetY;
+    if (e.target) e.target.style.cursor = 'grabbing';
+    if (e.preventDefault) e.preventDefault();
+}
+
+function arrastar(e) {
+    if (!_corteDragging || !_corteImg) return;
+    _corteOffsetX = e.clientX - _corteStartX;
+    _corteOffsetY = e.clientY - _corteStartY;
+    desenharCorte();
+    if (e.preventDefault) e.preventDefault();
+}
+
+function pararArraste() {
+    if (!_corteDragging) return;
+    _corteDragging = false;
+    const container = document.getElementById('crop-container');
+    if (container) container.style.cursor = 'grab';
+}
+
+function confirmarCorte() {
+    const canvas = _corteCanvas;
+    const ctx = _corteCtx;
+    if (!ctx || !_corteImg) return;
+    const outCanvas = document.createElement('canvas');
+    outCanvas.width = 200;
+    outCanvas.height = 200;
+    const outCtx = outCanvas.getContext('2d');
+    outCtx.save();
+    outCtx.beginPath();
+    outCtx.arc(100, 100, 100, 0, Math.PI * 2);
+    outCtx.clip();
+    outCtx.drawImage(canvas, 0, 0, 200, 200);
+    outCtx.restore();
+    outCanvas.toBlob(function(blob) {
+        _corteBlob = blob;
+        const previewUrl = URL.createObjectURL(blob);
+        const preview = document.getElementById('avatar-preview-admin');
+        if (preview) preview.innerHTML = `<img src="${previewUrl}" style="width:100%;height:100%;object-fit:cover;">`;
+        document.getElementById('msg-corte').textContent = '';
+        document.getElementById('modal-corte-foto').style.display = 'none';
+    }, 'image/jpeg', 0.9);
+}
+
+function cancelarCorte() {
+    _corteBlob = null;
+    _corteImg = null;
+    document.getElementById('meus-dados-foto').value = '';
+    document.getElementById('msg-corte').textContent = '';
+    document.getElementById('modal-corte-foto').style.display = 'none';
+}
+
+// foto selecionada -> abrir modal de corte
+document.addEventListener('DOMContentLoaded', () => {
+    const fotoInput = document.getElementById('meus-dados-foto');
+    if (fotoInput) {
+        fotoInput.addEventListener('change', function() {
+            if (!this.files?.length) return;
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                iniciarCorte(e.target.result);
+            };
+            reader.readAsDataURL(this.files[0]);
+        });
+    }
+    const container = document.getElementById('crop-container');
+    if (container) {
+        container.addEventListener('mousedown', iniciarArraste);
+        container.addEventListener('mousemove', arrastar);
+        container.addEventListener('mouseup', pararArraste);
+        container.addEventListener('mouseleave', pararArraste);
+        container.addEventListener('touchstart', function(e) {
+            const touch = e.touches[0];
+            iniciarArraste({ clientX: touch.clientX, clientY: touch.clientY, preventDefault: () => e.preventDefault() });
+        });
+        container.addEventListener('touchmove', function(e) {
+            const touch = e.touches[0];
+            arrastar({ clientX: touch.clientX, clientY: touch.clientY, preventDefault: () => e.preventDefault() });
+        });
+        container.addEventListener('touchend', pararArraste);
+    }
+});
+
+async function salvarMeusDados() {
+    const msg = document.getElementById('msg-meus-dados');
+    const user = _meusDadosUser;
+    if (!user) { msg.textContent = 'Erro: usuário não carregado.'; return; }
+
+    const endereco = document.getElementById('meus-dados-endereco')?.value?.trim() || '';
+
+    try {
+        const session = await client.auth.getSession();
+        const token = session.data.session?.access_token;
+        if (!token) { msg.textContent = 'Sessão expirada.'; return; }
+
+        msg.textContent = 'Salvando...';
+
+        // upload foto cortada se houver
+        if (_corteBlob) {
+            const formData = new FormData();
+            formData.append('foto', _corteBlob, 'foto_perfil.jpg');
+            const fotoRes = await fetch(`${API_URL}/users/${user.id}/foto`, {
+                method: 'POST',
+                headers: { Authorization: `Bearer ${token}` },
+                body: formData
+            });
+            if (!fotoRes.ok) {
+                const fotoErr = await fotoRes.json().catch(() => ({}));
+                msg.textContent = fotoErr.erro || 'Erro ao enviar foto.';
+                return;
+            }
+            const fotoData = await fotoRes.json();
+            if (fotoData.url) {
+                _meusDadosUser.user_metadata.foto_url = fotoData.url;
+                const preview = document.getElementById('avatar-preview-admin');
+                if (preview) preview.innerHTML = `<img src="${fotoData.url}" style="width:100%;height:100%;object-fit:cover;">`;
+                const sidebarAvatar = document.getElementById('avatar-sidebar-admin');
+                if (sidebarAvatar) sidebarAvatar.innerHTML = `<img src="${fotoData.url}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">`;
+            }
+        }
+
+        // salvar dados (sem empresa, apenas endereco)
+        const res = await fetch(`${API_URL}/users/${user.id}/dados`, {
+            method: 'PUT',
+            headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ endereco })
+        });
+        if (!res.ok) {
+            const d = await res.json().catch(() => ({}));
+            msg.textContent = d.erro || 'Erro ao salvar.';
+            return;
+        }
+        const data = await res.json();
+        if (data.user_metadata) {
+            _meusDadosUser.user_metadata = { ..._meusDadosUser.user_metadata, ...data.user_metadata };
+        }
+        msg.textContent = 'Dados salvos com sucesso!';
+        msg.style.color = '#166534';
+    } catch (e) {
+        msg.textContent = 'Erro de conexão.';
+    }
+}
+
+// =============================
+// EMPRESAS
+// =============================
+async function carregarEmpresas() {
+    const lista = document.getElementById('lista-empresas');
+    const loading = document.getElementById('loading-empresas');
+    if (!lista) return;
+    if (loading) loading.style.display = 'block';
+    try {
+        const session = await client.auth.getSession();
+        const token = session.data.session?.access_token;
+        const res = await fetch(`${API_URL}/empresas`, { headers: { Authorization: `Bearer ${token}` } });
+        const empresas = await res.json();
+        if (loading) loading.style.display = 'none';
+        if (!empresas.length) { lista.innerHTML = '<p>Nenhuma empresa cadastrada.</p>'; return; }
+        lista.innerHTML = '';
+        empresas.forEach(e => {
+            const div = document.createElement('div');
+            div.className = 'user';
+            div.innerHTML = `<div class="user-info"><strong>${e.razao_social}</strong><span>CNPJ: ${e.cnpj}</span></div>`;
+            lista.appendChild(div);
+        });
+    } catch (err) {
+        if (loading) loading.style.display = 'none';
+        lista.innerHTML = '<p>Erro ao carregar empresas.</p>';
+    }
+}
+
+function abrirModalEmpresa() {
+    document.getElementById('empresa-razao').value = '';
+    document.getElementById('empresa-cnpj').value = '';
+    document.getElementById('msg-empresa').textContent = '';
+    document.getElementById('modal-empresa').style.display = 'flex';
+}
+
+function fecharModalEmpresa() {
+    document.getElementById('modal-empresa').style.display = 'none';
+}
+
+async function salvarEmpresa() {
+    const razao = document.getElementById('empresa-razao').value.trim().toUpperCase();
+    const cnpj = document.getElementById('empresa-cnpj').value.trim();
+    const msg = document.getElementById('msg-empresa');
+    if (!razao || !cnpj) { msg.textContent = 'Preencha todos os campos.'; return; }
+    try {
+        const session = await client.auth.getSession();
+        const token = session.data.session?.access_token;
+        const res = await fetch(`${API_URL}/empresas`, {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ razao_social: razao, cnpj })
+        });
+        if (!res.ok) { const d = await res.json().catch(() => ({})); msg.textContent = d.erro || 'Erro ao salvar.'; return; }
+        msg.textContent = 'Empresa cadastrada!';
+        msg.style.color = '#166534';
+        setTimeout(() => { fecharModalEmpresa(); carregarEmpresas(); }, 1000);
+    } catch (e) { msg.textContent = 'Erro de conexão.'; }
+}
+
+// =============================
+// POPULAR DROPDOWNS DE EMPRESA
+// =============================
+async function popularSelectEmpresa(selectId, valorAtual) {
+    const select = document.getElementById(selectId);
+    if (!select) return;
+    try {
+        const session = await client.auth.getSession();
+        const token = session.data.session?.access_token;
+        const res = await fetch(`${API_URL}/empresas`, { headers: { Authorization: `Bearer ${token}` } });
+        const empresas = await res.json();
+        select.innerHTML = '<option value="">Sem empresa</option>';
+        empresas.forEach(e => {
+            const opt = document.createElement('option');
+            opt.value = e.razao_social;
+            opt.textContent = e.razao_social;
+            if (e.razao_social === valorAtual) opt.selected = true;
+            select.appendChild(opt);
+        });
+    } catch (e) { select.innerHTML = '<option value="">Sem empresa</option>'; }
+}
+
+// sobreescreve abrirModalCadastro para popular empresa
+const _abrirModalCadastroBase = window.abrirModalCadastro;
+window.abrirModalCadastro = function(nomeSugerido, cpfSugerido) {
+    _abrirModalCadastroBase(nomeSugerido, cpfSugerido);
+    popularSelectEmpresa('empresa', '');
+};
+
+// sobreescreve alterarCadastroUsuario para popular empresa e tipo no edit
+const _alterarCadastroBase = window.alterarCadastroUsuario;
+window.alterarCadastroUsuario = function(userId, emailAtual, nomeAtual, fotoAtual, empresaAtual, tipoAtual) {
+    _alterarCadastroBase(userId, emailAtual, nomeAtual, fotoAtual);
+    popularSelectEmpresa('edit-empresa', empresaAtual || '');
+    const tipoSelect = document.getElementById('edit-tipo');
+    if (tipoSelect && tipoAtual) tipoSelect.value = tipoAtual;
+};
+
+// =============================
+// NOTIFICAÇÕES
+// =============================
+function solicitarPermissaoNotificacao() {
+    if (!('Notification' in window)) return;
+    if (Notification.permission === 'default') {
+        Notification.requestPermission();
+    }
+}
+
+function mostrarNotificacao(titulo, corpo) {
+    if (!('Notification' in window)) return;
+    if (Notification.permission === 'granted') {
+        new Notification(titulo, { body: corpo, icon: 'https://kidverte.vteximg.com.br/arquivos/kidvert-favicon.ico?v=636445463116770000' });
+    }
+}
+
+// notificar quando badge aparecer
+const _badgeObserver = new MutationObserver(() => {
+    const badges = ['badge-pendentes', 'badge-atestados', 'badge-confirmacoes'];
+    const algumNovo = badges.some(id => {
+        const el = document.getElementById(id);
+        return el && el.style.display !== 'none' && Number(el.textContent) > 0;
+    });
+    if (algumNovo) {
+        mostrarNotificacao('Kidverte RH', 'Há algo de novo!');
+    }
+});
 document.addEventListener('keydown', function(e) {
     if (e.key !== 'Escape') return;
     fecharVisualizarPdf();
@@ -1208,6 +1709,9 @@ document.addEventListener('keydown', function(e) {
     fecharModalEditar();
     fecharModalConfirmar();
     fecharModalSenha();
+    fecharModalMeusDados();
+    fecharModalEmpresa();
+    if (document.getElementById('modal-corte-foto')?.style.display === 'flex') cancelarCorte();
 });
 </script>
 </body>

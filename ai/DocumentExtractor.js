@@ -3,11 +3,10 @@ const MODEL =
     'gemini-1.5-flash';
 
 const PROMPTS = {
-    contracheque: `Analise este contracheque brasileiro e extraia os dados. Retorne APENAS JSON válido.`,
-    'folha-ponto': `Analise esta folha de ponto e retorne APENAS JSON válido.`,
-    ponto: `Analise este folha de ponto e retorne APENAS JSON válido.`,
-    comprovante: `Analise este comprovante e retorne APENAS JSON válido.`
-    
+    contracheque: `Analise este contracheque brasileiro e extraia os dados. Retorne APENAS JSON válido. Extraia o nome completo do funcionário (ignore nome da empresa), CPF, competência, salário bruto e líquido.`,
+    'folha-ponto': `Analise esta folha de ponto e retorne APENAS JSON válido. Extraia o nome completo do funcionário (ignore nome da empresa), CPF e período.`,
+    ponto: `Analise esta folha de ponto e retorne APENAS JSON válido. Extraia o nome completo do funcionário (ignore nome da empresa), CPF e período.`,
+    comprovante: `Analise este comprovante e retorne APENAS JSON válido. Extraia o nome completo do funcionário (ignore nome da empresa), CPF, valor e data.`
 };
 
 async function extrairDados(

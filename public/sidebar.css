@@ -125,6 +125,16 @@ body {
     text-overflow: ellipsis;
     white-space: nowrap;
 }
+.sidebar-avatar {
+    width: 28px; height: 28px;
+    border-radius: 50%;
+    background: #e5e7eb;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    overflow: hidden;
+}
 .btn-logout-sidebar {
     display: flex;
     align-items: center;

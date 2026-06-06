@@ -209,16 +209,16 @@ function irUploadComprovantes() {
     window.location.href = "upload-comprovantes.html";
 }
 
-function irCadastro(nomeSugerido = "") {
+function irCadastro(nomeSugerido = "", cpfSugerido = "") {
     if (document.getElementById("modal-cadastro")) {
-        abrirModalCadastro(nomeSugerido);
+        abrirModalCadastro(nomeSugerido, cpfSugerido);
         return;
     }
 
     window.location.href = "cadastro.html";
 }
 
-function abrirModalCadastro(nomeSugerido = "") {
+function abrirModalCadastro(nomeSugerido = "", cpfSugerido = "") {
     const modal = document.getElementById("modal-cadastro");
     if (!modal) {
         window.location.href = "cadastro.html";
@@ -235,7 +235,7 @@ function abrirModalCadastro(nomeSugerido = "") {
     if (nome) nome.value = String(nomeSugerido || "").toUpperCase();
     if (email) email.value = "";
     if (senha) senha.value = "";
-    if (cpf) cpf.value = "";
+    if (cpf) cpf.value = cpfSugerido || "";
     if (tipo) tipo.value = "funcionario";
     if (msg) {
         msg.innerText = "";
@@ -847,6 +847,7 @@ async function cadastrar() {
     const senha = document.getElementById("senha")?.value;
     const cpf = document.getElementById("cpf")?.value.trim().replace(/\D/g, "");
     const tipo = document.getElementById("tipo").value;
+    const empresa = document.getElementById("empresa")?.value || '';
 const msg = document.getElementById("msg");
 
 // remove caracteres não numéricos
@@ -963,7 +964,8 @@ if (!validarCPF(cpfLimpo)) {
                 email,
                 senha,
                 cpf: cpfLimpo,
-                tipo
+                tipo,
+                empresa
             })
         });
 
@@ -1091,6 +1093,20 @@ async function carregarUsuarios() {
                 user.user_metadata?.full_name ||
                 "Sem nome";
 
+            // avatar
+            const avatar = document.createElement("div");
+            avatar.style.cssText = 'width:40px;height:40px;border-radius:50%;background:#e5e7eb;overflow:hidden;flex-shrink:0;';
+            const fotoUrl = user.user_metadata?.foto_url;
+            if (fotoUrl) {
+                avatar.innerHTML = `<img src="${fotoUrl}" style="width:100%;height:100%;object-fit:cover;">`;
+            } else {
+                avatar.innerHTML = `<svg width="20" height="20" fill="none" stroke="#9ca3af" stroke-width="2" viewBox="0 0 24 24" style="position:relative;top:10px;left:10px;"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>`;
+            }
+
+            // wrapper avatar + texto
+            const infoWrapper = document.createElement("div");
+            infoWrapper.style.cssText = 'display:flex;align-items:center;gap:12px;';
+
             // user-info
             const userInfo =
                 document.createElement("div");
@@ -1110,8 +1126,15 @@ async function carregarUsuarios() {
             span.textContent =
                 user.email || "";
 
+            // empresa
+            const empresaUser = user.user_metadata?.empresa;
+            const empresaSpan = document.createElement('small');
+            empresaSpan.style.cssText = 'font-size:11px;color:#9ca3af;';
+            empresaSpan.textContent = empresaUser || '';
+
             userInfo.appendChild(strong);
             userInfo.appendChild(span);
+            if (empresaUser) userInfo.appendChild(empresaSpan);
 
             // actions
             const actions =
@@ -1145,7 +1168,11 @@ async function carregarUsuarios() {
                 () => {
                     alterarCadastroUsuario(
                         user.id,
-                        user.email
+                        user.email,
+                        user.user_metadata?.full_name || '',
+                        user.user_metadata?.foto_url || '',
+                        user.user_metadata?.empresa || '',
+                        user.user_metadata?.tipo || ''
                     );
                 }
             );
@@ -1162,7 +1189,9 @@ async function carregarUsuarios() {
             actions.appendChild(btnExcluir);
 
             // adiciona conteúdo
-            div.appendChild(userInfo);
+            infoWrapper.appendChild(avatar);
+            infoWrapper.appendChild(userInfo);
+            div.appendChild(infoWrapper);
             div.appendChild(actions);
 
             // adiciona lista
@@ -1388,7 +1417,7 @@ async function executarDelecaoUsuario(userId) {
 // =============================
 // ALTERAR CADASTRO
 // =============================
-function alterarCadastroUsuario(userId, emailAtual) {
+function alterarCadastroUsuario(userId, emailAtual, nomeAtual, fotoAtual) {
 
     userIdSelecionado = userId;
 
@@ -1396,6 +1425,19 @@ function alterarCadastroUsuario(userId, emailAtual) {
         emailAtual || "";
 
     document.getElementById("edit-senha").value = "";
+
+    // nome e foto no topo do modal
+    const nomeEl = document.getElementById("edit-nome-display");
+    if (nomeEl) nomeEl.textContent = nomeAtual || 'Sem nome';
+
+    const fotoEl = document.getElementById("edit-foto-display");
+    if (fotoEl) {
+        if (fotoAtual) {
+            fotoEl.innerHTML = `<img src="${fotoAtual}" style="width:100%;height:100%;object-fit:cover;">`;
+        } else {
+            fotoEl.innerHTML = `<svg width="60" height="60" fill="none" stroke="#9ca3af" stroke-width="1.5" viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>`;
+        }
+    }
 
     document.getElementById("modal-editar")
         .style.display = "flex";
@@ -1419,6 +1461,14 @@ async function confirmarAlteracaoCadastro() {
     const senha =
         document.getElementById("edit-senha")
             .value;
+
+    const empresa =
+        document.getElementById("edit-empresa")
+            ?.value || '';
+
+    const tipo =
+        document.getElementById("edit-tipo")
+            ?.value || '';
 
     const msg =
         document.getElementById("msg-editar");
@@ -1462,7 +1512,9 @@ async function confirmarAlteracaoCadastro() {
 
                 body: JSON.stringify({
                     email,
-                    senha
+                    senha,
+                    empresa,
+                    tipo
                 })
             }
         );

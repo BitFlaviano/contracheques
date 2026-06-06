@@ -265,7 +265,23 @@ function extrairMes(texto) {
     return null;
 }
 
-async function salvarDocumentoPendente({ buffer, nomeArquivo, nomeExtraido, tipo, mes, ano }) {
+function extrairNomeDoTexto(texto) {
+    if (!texto) return null;
+    const linhas = texto.split('\n');
+    for (const linha of linhas) {
+        const l = linha.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase().trim();
+        if (!l || l.length < 5) continue;
+        // Padrões comuns: "NOME: ...", "FUNCIONARIO: ...", "COLABORADOR: ...", "EMPREGADO: ..."
+        const match = l.match(/^(?:NOME|FUNCIONARIO|COLABORADOR|EMPREGADO|TRABALHADOR)\s*[:]\s*(.+)/);
+        if (match) {
+            const nome = match[1].trim();
+            if (nome.length >= 5 && /^[A-Z\s]+$/.test(nome)) return nome;
+        }
+    }
+    return null;
+}
+
+async function salvarDocumentoPendente({ buffer, nomeArquivo, nomeExtraido, cpfExtraido, tipo, mes, ano }) {
     const nomeSeguro = path.basename(nomeArquivo || `pendente_${Date.now()}.pdf`);
     const caminhoPendente = `pendentes/${Date.now()}_${nomeSeguro}`;
     const { error: uploadError } = await supabaseAdmin.storage
@@ -274,7 +290,8 @@ async function salvarDocumentoPendente({ buffer, nomeArquivo, nomeExtraido, tipo
     const { error: dbError } = await supabaseAdmin
         .from('documentos_pendentes').insert({
             nome_arquivo: nomeSeguro, caminho: caminhoPendente,
-            nome_extraido: nomeExtraido || null, tipo_detectado: tipo || null,
+            nome_extraido: nomeExtraido || null, cpf_extraido: cpfExtraido || null,
+            tipo_detectado: tipo || null,
             mes_detectado: mes || null, ano_detectado: ano || null,
             criado_em: new Date().toISOString()
         });
@@ -283,10 +300,10 @@ async function salvarDocumentoPendente({ buffer, nomeArquivo, nomeExtraido, tipo
 }
 
 async function garantirBuckets() {
-    const buckets = ['contracheques', 'folhas-ponto', 'atestados', 'comprovantes'];
+    const buckets = ['contracheques', 'folhas-ponto', 'atestados', 'comprovantes', 'perfis'];
     for (const bucket of buckets) {
         const { data } = await supabaseAdmin.storage.getBucket(bucket);
-        if (!data) await supabaseAdmin.storage.createBucket(bucket, { public: false });
+        if (!data) await supabaseAdmin.storage.createBucket(bucket, { public: bucket === 'perfis' });
     }
 }
 
@@ -440,6 +457,18 @@ async function processarPdfPorUsuario(req, res, bucket) {
                         if (error) console.log("ERRO STORAGE:", error.message);
                         else { console.log(`SALVO (pdf-parse): ${bucket}/${caminho}`); salvouAlgum = true; }
                     } else {
+                        // Tenta extrair nome por regex antes da IA
+                        const nomeExtraidoTexto = metade.texto ? extrairNomeDoTexto(metade.texto) : null;
+                        if (nomeExtraidoTexto) {
+                            await salvarDocumentoPendente({
+                                buffer: metade.buffer,
+                                nomeArquivo: `pagina_${i + 1}${sufixo}.pdf`,
+                                nomeExtraido: nomeExtraidoTexto, cpfExtraido: null, tipo: bucket, mes, ano: new Date().getFullYear()
+                            });
+                            totalPendentes++;
+                            continue;
+                        }
+                        let cpfExtraidoComprovante = null;
                         // Fallback IA para comprovantes
                         try {
                             const resultado = await processarESalvarNaFila(gemini, supabaseAdmin, {
@@ -451,6 +480,7 @@ async function processarPdfPorUsuario(req, res, bucket) {
                             if (resultado.sucesso) {
                                 const dados = resultado.dados;
                                 const nomeExtraido = dados.nome_funcionario || dados.funcionario || dados.nome || null;
+                                cpfExtraidoComprovante = dados.cpf || null;
                                 if (nomeExtraido) {
                                     const nomeNormalizado = normalizarTexto(nomeExtraido);
                                     const usuarioMatch = usuarios.find(u => {
@@ -479,7 +509,7 @@ async function processarPdfPorUsuario(req, res, bucket) {
                         await salvarDocumentoPendente({
                             buffer: metade.buffer,
                             nomeArquivo: `pagina_${i + 1}${sufixo}.pdf`,
-                            nomeExtraido: null, tipo: bucket, mes: null, ano: new Date().getFullYear()
+                            nomeExtraido: null, cpfExtraido: cpfExtraidoComprovante, tipo: bucket, mes: null, ano: new Date().getFullYear()
                         });
                         totalPendentes++;
                     }
@@ -507,6 +537,17 @@ async function processarPdfPorUsuario(req, res, bucket) {
                 continue;
             }
 
+            // === ETAPA 1.5: extrair nome por regex do texto (mesmo sem usuario cadastrado) ===
+            const nomeExtraidoTexto = textoPagina ? extrairNomeDoTexto(textoPagina) : null;
+            if (nomeExtraidoTexto) {
+                await salvarDocumentoPendente({
+                    buffer: pdfBytes, nomeArquivo: `pagina_${i + 1}.pdf`,
+                    nomeExtraido: nomeExtraidoTexto, cpfExtraido: null, tipo: bucket, mes, ano: new Date().getFullYear()
+                });
+                totalPendentes++;
+                continue;
+            }
+
             // === ETAPA 2: fallback IA (Gemini) ===
             console.log(`Página ${i + 1}: pdf-parse não identificou, acionando IA...`);
             try {
@@ -521,7 +562,7 @@ async function processarPdfPorUsuario(req, res, bucket) {
                     console.log(`Página ${i + 1} IA: ${resultado.erro}`);
                     await salvarDocumentoPendente({
                         buffer: pdfBytes, nomeArquivo: `pagina_${i + 1}.pdf`,
-                        nomeExtraido: null, tipo: bucket, mes: null, ano: new Date().getFullYear()
+                        nomeExtraido: null, cpfExtraido: null, tipo: bucket, mes: null, ano: new Date().getFullYear()
                     });
                     totalPendentes++;
                     continue;
@@ -529,11 +570,12 @@ async function processarPdfPorUsuario(req, res, bucket) {
 
                 const dados = resultado.dados;
                 const nomeExtraido = dados.nome_funcionario || dados.funcionario || dados.nome || null;
+                const cpfExtraido = dados.cpf || null;
 
                 if (!nomeExtraido) {
                     await salvarDocumentoPendente({
                         buffer: pdfBytes, nomeArquivo: `pagina_${i + 1}.pdf`,
-                        nomeExtraido: null, tipo: bucket, mes: null, ano: new Date().getFullYear()
+                        nomeExtraido: null, cpfExtraido, tipo: bucket, mes: null, ano: new Date().getFullYear()
                     });
                     totalPendentes++;
                     continue;
@@ -567,7 +609,7 @@ async function processarPdfPorUsuario(req, res, bucket) {
                 console.error(`Página ${i + 1} erro IA:`, aiErr.message);
                 await salvarDocumentoPendente({
                     buffer: pdfBytes, nomeArquivo: `pagina_${i + 1}.pdf`,
-                    nomeExtraido: null, tipo: bucket, mes: null, ano: new Date().getFullYear()
+                    nomeExtraido: null, cpfExtraido: null, tipo: bucket, mes: null, ano: new Date().getFullYear()
                 });
                 totalPendentes++;
             }
@@ -936,10 +978,12 @@ app.put('/fila-revisao/:id', async (req, res) => {
 // ROTA: CADASTRO
 // =============================
 app.post('/register', async (req, res) => {
-    const { email, senha, nome, cpf, tipo } = req.body;
+    const { email, senha, nome, cpf, tipo, empresa } = req.body;
+    const metadata = { full_name: nome, cpf, tipo };
+    if (empresa) metadata.empresa = empresa;
     const { error } = await supabaseAdmin.auth.admin.createUser({
         email, password: senha, email_confirm: true,
-        user_metadata: { full_name: nome, cpf, tipo }
+        user_metadata: metadata
     });
     if (error) return res.status(400).json({ erro: error.message });
     res.json({ sucesso: true });
@@ -1326,14 +1370,109 @@ app.put('/users/:id', async (req, res) => {
         const admin = await validarAdmin(req, res);
         if (!admin) return;
 
-        const { email, senha } = req.body;
+        const { email, senha, empresa, tipo } = req.body;
         const dadosAtualizacao = {};
         if (email) dadosAtualizacao.email = email;
         if (senha) dadosAtualizacao.password = senha;
 
+        // atualiza user_metadata se empresa ou tipo foram enviados
+        if (empresa !== undefined || tipo !== undefined) {
+            const { data: userData } = await supabaseAdmin.auth.admin.getUserById(req.params.id);
+            if (userData?.user) {
+                const meta = { ...userData.user.user_metadata };
+                if (empresa !== undefined) meta.empresa = empresa;
+                if (tipo !== undefined) meta.tipo = tipo;
+                dadosAtualizacao.user_metadata = meta;
+            }
+        }
+
         const { data, error } = await supabaseAdmin.auth.admin.updateUserById(req.params.id, dadosAtualizacao);
         if (error) return res.status(400).json({ erro: error.message });
         res.json({ sucesso: true, user: data });
+    } catch (err) {
+        res.status(500).json({ erro: err.message });
+    }
+});
+
+// =============================
+// EMPRESAS
+// =============================
+app.get('/empresas', async (req, res) => {
+    try {
+        const admin = await validarAdmin(req, res);
+        if (!admin) return;
+        const { data, error } = await supabaseAdmin.from('empresas').select('*').order('razao_social');
+        if (error) return res.status(500).json({ erro: error.message });
+        res.json(data || []);
+    } catch (err) {
+        res.status(500).json({ erro: err.message });
+    }
+});
+
+app.post('/empresas', async (req, res) => {
+    try {
+        const admin = await validarAdmin(req, res);
+        if (!admin) return;
+        const { razao_social, cnpj } = req.body;
+        if (!razao_social || !cnpj) return res.status(400).json({ erro: 'Razão social e CNPJ são obrigatórios' });
+        const { data, error } = await supabaseAdmin.from('empresas').insert({
+            razao_social, cnpj, criado_em: new Date().toISOString()
+        }).select().single();
+        if (error) return res.status(500).json({ erro: error.message });
+        res.json(data);
+    } catch (err) {
+        res.status(500).json({ erro: err.message });
+    }
+});
+
+// =============================
+// PROFILE / MEUS DADOS
+// =============================
+app.put('/users/:id/dados', async (req, res) => {
+    try {
+        const user = await validarUsuario(req, res);
+        if (!user || user.id !== req.params.id) return res.status(403).json({ erro: 'Acesso negado' });
+
+        const { endereco, empresa } = req.body;
+        const metadata = {};
+        if (endereco !== undefined) metadata.endereco = endereco;
+        if (empresa !== undefined) metadata.empresa = empresa;
+
+        const { data, error } = await supabaseAdmin.auth.admin.updateUserById(req.params.id, {
+            user_metadata: { ...user.user_metadata, ...metadata }
+        });
+        if (error) return res.status(400).json({ erro: error.message });
+        res.json({ sucesso: true, user_metadata: data.user.user_metadata });
+    } catch (err) {
+        res.status(500).json({ erro: err.message });
+    }
+});
+
+app.post('/users/:id/foto', upload.single('foto'), async (req, res) => {
+    try {
+        const user = await validarUsuario(req, res);
+        if (!user || user.id !== req.params.id) return res.status(403).json({ erro: 'Acesso negado' });
+
+        const file = req.file;
+        if (!file) return res.status(400).json({ erro: 'Nenhuma foto enviada' });
+
+        const ext = path.extname(file.originalname) || '.jpg';
+        const nomeArquivo = `perfil_${req.params.id}${ext}`;
+
+        const { error: upErr } = await supabaseAdmin.storage
+            .from('perfis')
+            .upload(nomeArquivo, file.buffer, { contentType: file.mimetype, upsert: true });
+        if (upErr) return res.status(500).json({ erro: upErr.message });
+
+        const { data: pubData } = supabaseAdmin.storage.from('perfis').getPublicUrl(nomeArquivo);
+        const url = pubData?.publicUrl || `https://uatryxvylqwslnaxggjk.supabase.co/storage/v1/object/public/perfis/${nomeArquivo}`;
+
+        const { error: metaErr } = await supabaseAdmin.auth.admin.updateUserById(req.params.id, {
+            user_metadata: { ...user.user_metadata, foto_url: url }
+        });
+        if (metaErr) console.error('Erro ao salvar foto_url:', metaErr.message);
+
+        res.json({ sucesso: true, url });
     } catch (err) {
         res.status(500).json({ erro: err.message });
     }
