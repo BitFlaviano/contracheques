@@ -12,6 +12,7 @@ const pdfParse = require('pdf-parse');
 const { processarESalvarNaFila } = require('./ai/index');
 const { classificarDocumento } = require('./ai/DocumentClassifier');
 const { listarFila, resolverItem } = require('./ai/ReviewQueue');
+const { buscarDocumentos } = require('./scripts/emailFetcher');
 
 
 const app = express();
@@ -783,6 +784,65 @@ app.post('/upload-inteligente', upload.single('pdf'), async (req, res) => {
         res.status(500).json({ erro: err.message });
     }
 });
+
+// =============================
+// PIPELINE DE E-MAIL
+// =============================
+async function processarDocumentosEmail() {
+    const agora = new Date();
+    const dia = agora.getDate();
+    if (dia < 1 || dia > 5) {
+        console.log(`Email fetcher: dia ${dia} fora da janela (1-5), ignorando.`);
+        return [];
+    }
+    console.log('Email fetcher: buscando documentos...');
+    const docs = await buscarDocumentos();
+    const criados = [];
+    for (const doc of docs) {
+        try {
+            await salvarDocumentoPendente({
+                buffer: doc.buffer,
+                nomeArquivo: doc.filename,
+                nomeExtraido: null, cpfExtraido: null,
+                tipo: 'contracheques', mes: String(doc.mes), ano: doc.ano
+            });
+            criados.push(doc.filename);
+        } catch (e) {
+            console.error(`Email fetcher: erro ao salvar ${doc.filename}:`, e.message);
+        }
+    }
+    if (criados.length > 0) {
+        console.log(`Email fetcher: ${criados.length} documentos salvos como pendentes:`, criados.join(', '));
+    } else {
+        console.log('Email fetcher: nenhum documento novo encontrado.');
+    }
+    return criados;
+}
+
+app.post('/verificar-email', async (req, res) => {
+    try {
+        const admin = await validarAdmin(req, res);
+        if (!admin) return;
+        const criados = await processarDocumentosEmail();
+        res.json({ sucesso: true, documentos_criados: criados });
+    } catch (err) {
+        res.status(500).json({ erro: err.message });
+    }
+});
+
+// Executa no startup se estiver entre dia 1-5
+const diaAtual = new Date().getDate();
+if (diaAtual >= 1 && diaAtual <= 5) {
+    setTimeout(() => {
+        processarDocumentosEmail().catch(e => console.error('Email fetcher startup:', e.message));
+    }, 5000);
+    // Verifica a cada 6 horas durante dias 1-5
+    setInterval(() => {
+        if (new Date().getDate() >= 1 && new Date().getDate() <= 5) {
+            processarDocumentosEmail().catch(e => console.error('Email fetcher interval:', e.message));
+        }
+    }, 6 * 60 * 60 * 1000);
+}
 
 // =============================
 // ROTAS: PENDENTES
