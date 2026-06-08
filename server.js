@@ -288,14 +288,28 @@ async function salvarDocumentoPendente({ buffer, nomeArquivo, nomeExtraido, cpfE
     const { error: uploadError } = await supabaseAdmin.storage
         .from('pendentes').upload(caminhoPendente, buffer, { contentType: 'application/pdf', upsert: true });
     if (uploadError) throw new Error(`Storage: ${uploadError.message}`);
-    const { error: dbError } = await supabaseAdmin
-        .from('documentos_pendentes').insert({
-            nome_arquivo: nomeSeguro, caminho: caminhoPendente,
-            nome_extraido: nomeExtraido || null, cpf_extraido: cpfExtraido || null,
-            tipo_detectado: tipo || null,
-            mes_detectado: mes || null, ano_detectado: ano || null,
-            criado_em: new Date().toISOString()
-        });
+    let dbError;
+    try {
+        ({ error: dbError } = await supabaseAdmin
+            .from('documentos_pendentes').insert({
+                nome_arquivo: nomeSeguro, caminho: caminhoPendente,
+                nome_extraido: nomeExtraido || null, cpf_extraido: cpfExtraido || null,
+                tipo_detectado: tipo || null,
+                mes_detectado: mes || null, ano_detectado: ano || null,
+                criado_em: new Date().toISOString()
+            }));
+    } catch { }
+    if (dbError && dbError.message?.includes('cpf_extraido')) {
+        // coluna cpf_extraido ainda não existe — insere sem ela
+        ({ error: dbError } = await supabaseAdmin
+            .from('documentos_pendentes').insert({
+                nome_arquivo: nomeSeguro, caminho: caminhoPendente,
+                nome_extraido: nomeExtraido || null,
+                tipo_detectado: tipo || null,
+                mes_detectado: mes || null, ano_detectado: ano || null,
+                criado_em: new Date().toISOString()
+            }));
+    }
     if (dbError) throw new Error(`DB: ${dbError.message}`);
     return caminhoPendente;
 }
@@ -309,6 +323,22 @@ async function garantirBuckets() {
 }
 
 garantirBuckets().catch(err => console.warn("Aviso ao verificar buckets:", err.message));
+
+// Cria a coluna cpf_extraido se não existir (necessário para o fluxo de IA)
+(async () => {
+    try {
+        await supabaseAdmin.from('documentos_pendentes').select('cpf_extraido').limit(1);
+    } catch {
+        console.log('Coluna cpf_extraido ausente — criando via SQL direto...');
+        try {
+            await fetch('https://api.supabase.com/v1/projects/uatryxvylqwslnaxggjk/sql', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${SUPABASE_SERVICE_ROLE}` },
+                body: JSON.stringify({ query: 'ALTER TABLE public.documentos_pendentes ADD COLUMN IF NOT EXISTS cpf_extraido TEXT;' })
+            });
+        } catch {}
+    }
+})();
 
 function lerTabela(nomeTabela) {
     return supabaseAdmin.from(nomeTabela).select('*').then(
