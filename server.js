@@ -287,7 +287,7 @@ async function salvarDocumentoPendente({ buffer, nomeArquivo, nomeExtraido, cpfE
     const caminhoPendente = `pendentes/${Date.now()}_${nomeSeguro}`;
     const { error: uploadError } = await supabaseAdmin.storage
         .from('pendentes').upload(caminhoPendente, buffer, { contentType: 'application/pdf', upsert: true });
-    if (uploadError) console.error('Erro ao salvar pendente no storage:', uploadError.message);
+    if (uploadError) throw new Error(`Storage: ${uploadError.message}`);
     const { error: dbError } = await supabaseAdmin
         .from('documentos_pendentes').insert({
             nome_arquivo: nomeSeguro, caminho: caminhoPendente,
@@ -296,12 +296,12 @@ async function salvarDocumentoPendente({ buffer, nomeArquivo, nomeExtraido, cpfE
             mes_detectado: mes || null, ano_detectado: ano || null,
             criado_em: new Date().toISOString()
         });
-    if (dbError) console.error('Erro ao inserir pendente:', dbError.message);
+    if (dbError) throw new Error(`DB: ${dbError.message}`);
     return caminhoPendente;
 }
 
 async function garantirBuckets() {
-    const buckets = ['contracheques', 'folhas-ponto', 'atestados', 'comprovantes', 'perfis'];
+    const buckets = ['contracheques', 'folhas-ponto', 'atestados', 'comprovantes', 'perfis', 'pendentes'];
     for (const bucket of buckets) {
         const { data } = await supabaseAdmin.storage.getBucket(bucket);
         if (!data) await supabaseAdmin.storage.createBucket(bucket, { public: bucket === 'perfis' });
@@ -788,12 +788,14 @@ app.post('/upload-inteligente', upload.single('pdf'), async (req, res) => {
 // =============================
 // PIPELINE DE E-MAIL
 // =============================
-async function processarDocumentosEmail() {
-    const agora = new Date();
-    const dia = agora.getDate();
-    if (dia < 1 || dia > 5) {
-        console.log(`Email fetcher: dia ${dia} fora da janela (1-5), ignorando.`);
-        return [];
+async function processarDocumentosEmail(forcar) {
+    if (!forcar) {
+        const agora = new Date();
+        const dia = agora.getDate();
+        if (dia < 1 || dia > 5) {
+            console.log(`Email fetcher: dia ${dia} fora da janela (1-5), ignorando.`);
+            return [];
+        }
     }
     console.log('Email fetcher: buscando documentos...');
     const docs = await buscarDocumentos();
@@ -823,7 +825,7 @@ app.post('/verificar-email', async (req, res) => {
     try {
         const admin = await validarAdmin(req, res);
         if (!admin) return;
-        const criados = await processarDocumentosEmail();
+        const criados = await processarDocumentosEmail(true);
         res.json({ sucesso: true, documentos_criados: criados });
     } catch (err) {
         res.status(500).json({ erro: err.message });
