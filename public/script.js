@@ -801,6 +801,9 @@ async function confirmarDownload() {
 
         if (!baixou) return;
 
+        const bucket = arquivoBucket;
+        const caminhoArquivo = arquivoPendente;
+
         // fecha modal
         document.getElementById(
             "modal-termos"
@@ -812,6 +815,47 @@ async function confirmarDownload() {
 
         if (typeof carregarConfirmacoes === "function") {
             carregarConfirmacoes();
+        }
+
+        // remove item da lista e atualiza badge
+        const badgeMap = {
+            contracheques: 'badge-contracheques',
+            comprovantes: 'badge-comprovantes',
+            'folhas-ponto': 'badge-ponto'
+        };
+        const badgeId = badgeMap[bucket];
+        if (badgeId) {
+            const b = document.getElementById(badgeId);
+            if (b) {
+                const n = Math.max(0, Number(b.textContent) - 1);
+                b.textContent = n;
+                b.style.display = n ? 'inline-flex' : 'none';
+            }
+        }
+
+        const listaMap = {
+            contracheques: 'lista-arquivos',
+            comprovantes: 'lista-comprovantes',
+            'folhas-ponto': 'lista-ponto'
+        };
+        const listaId = listaMap[bucket];
+        if (listaId) {
+            const lista = document.getElementById(listaId);
+            if (lista) {
+                const nomeArquivo = caminhoArquivo?.split('/').pop();
+                const itens = lista.querySelectorAll('.documento');
+                itens.forEach(item => {
+                    const span = item.querySelector('span');
+                    if (span && span.textContent === nomeArquivo) {
+                        item.remove();
+                    }
+                });
+                if (lista.querySelectorAll('.documento').length === 0) {
+                    if (lista.id === 'lista-arquivos') lista.innerText = 'Nenhum contracheque disponível nos últimos 3 meses.';
+                    else if (lista.id === 'lista-ponto') lista.innerText = 'Nenhuma folha de ponto disponível neste mês.';
+                    else if (lista.id === 'lista-comprovantes') lista.innerText = 'Nenhum comprovante disponível.';
+                }
+            }
         }
 
     } finally {

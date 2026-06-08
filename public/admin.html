@@ -47,6 +47,11 @@
             <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="2" y="7" width="20" height="14" rx="2" ry="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>
             Empresas
         </a>
+        <a href="#" class="nav-item" onclick="irSecao('solicitacoes',this)">
+            <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+            Solicitações
+            <span class="badge-pendente" id="badge-solicitacoes" style="display:none">0</span>
+        </a>
         <a href="#" class="nav-item" onclick="irSecao('confirmacoes',this)">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
             Confirmações
@@ -295,6 +300,18 @@
         </div>
     </section>
 
+    <!-- SOLICITAÇÕES DE CONTRACHEQUES -->
+    <section class="secao" id="secao-solicitacoes">
+        <div class="page-header">
+            <h2>Solicitações de Contracheques</h2>
+            <p class="page-subtitle">Solicitações de contracheques antigos feitas pelos funcionários</p>
+        </div>
+        <div class="card">
+            <div id="loading-solicitacoes-admin" style="display:none;"><div class="dots"></div></div>
+            <div id="lista-solicitacoes-admin"></div>
+        </div>
+    </section>
+
     <!-- PENDENTES -->
     <section class="secao" id="secao-pendentes">
         <div class="page-header">
@@ -522,6 +539,7 @@ let _confirmFullCarregado = false;
 let _atestadosFullCarregado = false;
 let _pendentesCarregados = false;
 let _contrachequesAdminCarregado = false;
+let _solicitacoesAdminCarregado = false;
 let _todasConfirmacoesAdmin = [];
 
 function irSecao(nome, el) {
@@ -544,6 +562,14 @@ function irSecao(nome, el) {
     }
     if (nome === 'confirmacoes') {
         const b = document.getElementById('badge-confirmacoes');
+        if (b) { b.textContent = '0'; b.style.display = 'none'; }
+    }
+    if (nome === 'solicitacoes' && !_solicitacoesAdminCarregado) {
+        _solicitacoesAdminCarregado = true;
+        carregarSolicitacoes();
+    }
+    if (nome === 'solicitacoes') {
+        const b = document.getElementById('badge-solicitacoes');
         if (b) { b.textContent = '0'; b.style.display = 'none'; }
     }
     if (nome === 'atestados' && !_atestadosFullCarregado) {
@@ -1164,6 +1190,13 @@ async function carregarMetricasAdmin() {
             badgeConf.style.display = n ? 'inline-flex' : 'none';
         }
 
+        const badgeSol = document.getElementById('badge-solicitacoes');
+        if (badgeSol) {
+            const pendentesCount = (dados.solicitacoesPorStatus?.pendente || 0);
+            badgeSol.textContent = pendentesCount;
+            badgeSol.style.display = pendentesCount ? 'inline-flex' : 'none';
+        }
+
         renderMetricasCarrossel('metricas-acessos', dados.porFuncionario, 'acessos', 'Nenhum acesso no periodo.');
         renderMetricasLista('metricas-solicitacoes', dados.porFuncionario, 'solicitacoes', 'Nenhuma solicitacao no periodo.');
         renderMetricasLista('metricas-atestados', dados.porFuncionario, 'atestados', 'Nenhum atestado no periodo.');
@@ -1704,7 +1737,7 @@ function mostrarNotificacao(titulo, corpo) {
 
 // notificar quando badge aparecer
 const _badgeObserver = new MutationObserver(() => {
-    const badges = ['badge-pendentes', 'badge-atestados', 'badge-confirmacoes'];
+    const badges = ['badge-pendentes', 'badge-atestados', 'badge-confirmacoes', 'badge-solicitacoes'];
     const algumNovo = badges.some(id => {
         const el = document.getElementById(id);
         return el && el.style.display !== 'none' && Number(el.textContent) > 0;
