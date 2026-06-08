@@ -396,8 +396,7 @@ async function processarPaginaComprovante({ pagePdfBuffer, pageNumber }) {
         textoPagina = dadosPagina.text || '';
     } catch { }
 
-    const temCorte = textoPagina ? /cort[ea]\s*aqui/i.test(textoPagina) : false;
-    const ySplit = temCorte ? 0.5 : 0.5;
+    const ySplit = 0.404;
 
     const doc = await PDFDocument.load(pagePdfBuffer);
     const topo = await extrairMetadePagina(doc, 0, 'topo', ySplit);
