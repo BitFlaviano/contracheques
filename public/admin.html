@@ -240,15 +240,22 @@
             </div>
         </div>
         <div class="card upload-card">
+            <div style="margin-bottom:12px;display:flex;gap:16px;flex-wrap:wrap;align-items:center;">
+                <span style="font-size:13px;color:#6b7280;font-weight:500;">Tipo do documento:</span>
+                <label style="font-size:13px;cursor:pointer;"><input type="radio" name="tipo-upload" value="auto" checked onchange="atualizarHintUpload()"> Automático</label>
+                <label style="font-size:13px;cursor:pointer;"><input type="radio" name="tipo-upload" value="contracheques" onchange="atualizarHintUpload()"> Contracheque</label>
+                <label style="font-size:13px;cursor:pointer;"><input type="radio" name="tipo-upload" value="comprovantes" onchange="atualizarHintUpload()"> Comprovante</label>
+                <label style="font-size:13px;cursor:pointer;"><input type="radio" name="tipo-upload" value="folhas-ponto" onchange="atualizarHintUpload()"> Folha de Ponto</label>
+            </div>
             <div class="upload-zone" id="upload-zone"
                 ondragover="event.preventDefault(); this.classList.add('drag-over')"
                 ondragleave="this.classList.remove('drag-over')"
                 ondrop="handleUploadDrop(event)">
                 <svg width="48" height="48" fill="none" stroke="#9ca3af" stroke-width="1.5" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
                 <p class="upload-title">Arraste o PDF aqui ou clique para selecionar</p>
-                <p class="upload-hint">Contracheques, Comprovantes ou Folha de Ponto</p>
+                <p class="upload-hint" id="upload-hint-text">Contracheques, Comprovantes ou Folha de Ponto</p>
                 <input type="file" id="input-upload-inteligente" accept=".pdf" style="display:none" onchange="processarUploadInteligente(this.files[0])">
-                <button class="btn-outline" onclick="document.getElementById('input-upload-inteligente').click()">Selecionar PDF</button>
+                <button class="btn-outline" onclick="limparUpload(); document.getElementById('input-upload-inteligente').click()">Selecionar PDF</button>
             </div>
         </div>
         <div id="upload-progresso" style="display:none;" class="card">
@@ -259,6 +266,7 @@
             <div id="upload-status-detalhado" class="upload-status-detalhado" aria-live="polite">
                 <div id="upload-status-stream" class="upload-status-stream"></div>
             </div>
+            <button id="btn-cancelar-upload" class="btn-outline" style="margin-top:12px;" onclick="cancelarUpload()">Cancelar</button>
         </div>
         <div id="upload-resultado" style="display:none;" class="card">
             <h3>Resultado do Processamento</h3>
@@ -527,6 +535,51 @@
 </div>
 
 <footer class="site-footer">&copy; Flaviano Porto 2026</footer>
+<div id="modal-corte-comprovante" class="modal" style="display:none;">
+    <div class="modal-content" style="width:700px;max-width:95vw;max-height:90vh;display:flex;flex-direction:column;padding:0;">
+        <div style="padding:20px 26px 0;">
+            <h3>Ajustar Corte — Comprovante de Pagamento</h3>
+            <p style="font-size:13px;color:#6b7280;margin:4px 0 12px;">Arraste a barra ou use o slider para definir onde cortar. Role o documento para ver a área de corte.</p>
+        </div>
+        <div id="corte-container" style="position:relative;width:100%;flex:1;overflow:auto;background:#f3f4f6;border-top:1px solid #d1d5db;border-bottom:1px solid #d1d5db;">
+            <canvas id="corte-canvas" style="display:block;"></canvas>
+            <div id="corte-linha" style="position:absolute;left:0;right:0;height:16px;cursor:ns-resize;z-index:10;top:40%;">
+                <div style="position:absolute;left:0;right:0;top:6px;height:4px;background:#ef4444;border-radius:2px;pointer-events:none;box-shadow:0 0 6px rgba(239,68,68,0.5);"></div>
+                <div style="position:absolute;top:4px;left:50%;margin-left:-7px;width:14px;height:8px;background:#ef4444;border-radius:3px;pointer-events:none;"></div>
+            </div>
+        </div>
+        <div class="corte-footer" style="padding:12px 26px 20px;background:#fff;border-radius:0 0 10px 10px;">
+            <div style="display:flex;align-items:center;gap:16px;margin-bottom:8px;">
+                <span style="font-size:13px;color:#4b5563;white-space:nowrap;">Posição do corte:</span>
+                <input type="range" id="corte-slider" min="5" max="95" value="40" style="flex:1;" oninput="atualizarLinhaCorte(this.value)">
+                <span id="corte-porcentagem" style="font-size:14px;font-weight:600;color:#374151;min-width:48px;text-align:center;">40%</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:10px;justify-content:center;min-height:44px;">
+                <div id="corte-loading" style="display:none;align-items:center;gap:8px;">
+                    <div class="dots" style="margin:0;"></div>
+                    <span id="corte-loading-msg" style="font-size:13px;color:#4b5563;">Processando corte...</span>
+                </div>
+                <div id="corte-buttons" style="display:flex;gap:10px;">
+                    <button class="btn-primary" id="btn-confirmar-corte" onclick="confirmarCorteComprovante()">Confirmar Corte</button>
+                    <button id="btn-cancelar-corte-modal" onclick="cancelarCorteComprovante()" style="background:#6c757d;color:#fff;border:none;padding:8px 20px;border-radius:6px;cursor:pointer;">Cancelar</button>
+                </div>
+            </div>
+            <div id="msg-corte" style="font-size:13px;min-height:0;color:#4b5563;text-align:center;margin-top:4px;"></div>
+        </div>
+    </div>
+</div>
+
+<style>
+#corte-container { position:relative; }
+#corte-container embed { pointer-events:none; }
+#corte-linha { transition: none; }
+#corte-linha:hover { cursor:ns-resize; }
+#corte-canvas { display:block; }
+</style>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script>pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
+
 <script src="/supabase.js"></script>
 <script src="script.js"></script>
 <script>
@@ -563,6 +616,7 @@ function irSecao(nome, el) {
     if (nome === 'confirmacoes') {
         const b = document.getElementById('badge-confirmacoes');
         if (b) { b.textContent = '0'; b.style.display = 'none'; }
+        marcarConfirmacoesVistas();
     }
     if (nome === 'solicitacoes' && !_solicitacoesAdminCarregado) {
         _solicitacoesAdminCarregado = true;
@@ -640,12 +694,13 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     } catch(e) {}
 
-    solicitarPermissaoNotificacao();
-    const badges = ['badge-pendentes', 'badge-atestados', 'badge-confirmacoes'];
-    badges.forEach(id => {
-        const el = document.getElementById(id);
-        if (el) _badgeObserver.observe(el, { attributes: true, childList: true, characterData: true, subtree: true });
-    });
+    // redirecionar para seção via query string (ex: ?secao=solicitacoes)
+    const params = new URLSearchParams(window.location.search);
+    const secaoParam = params.get('secao');
+    if (secaoParam) {
+        const navItem = document.querySelector(`.nav-item[onclick*="'${secaoParam}'"]`);
+        if (navItem) irSecao(secaoParam, navItem);
+    }
 
     // shadow na topbar ao scroll (mobile)
     const topbar = document.querySelector('.topbar');
@@ -777,6 +832,20 @@ function aplicarFiltros() {
     _renderConfirmacoesAdmin(r);
 }
 
+async function marcarConfirmacoesVistas() {
+    try {
+        const session = await client.auth.getSession();
+        const token = session.data.session?.access_token;
+        if (!token) return;
+        await fetch(`${API_URL}/confirmacoes/marcar-vistas`, {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${token}` }
+        });
+    } catch (e) {
+        console.error('Erro ao marcar confirmações como vistas:', e);
+    }
+}
+
 async function carregarConfirmacoesAdmin() {
     const loading = document.getElementById('loading-confirmacoes-full');
     const lista = document.getElementById('lista-confirmacoes-full');
@@ -853,6 +922,28 @@ function handleUploadDrop(e) {
     else alert('Por favor envie um arquivo PDF.');
 }
 
+let _sessionIdCorte = null;
+
+function atualizarHintUpload() {
+    const sel = document.querySelector('input[name="tipo-upload"]:checked');
+    const hint = document.getElementById('upload-hint-text');
+    if (!sel || sel.value === 'auto') hint.textContent = 'Contracheques, Comprovantes ou Folha de Ponto';
+    else if (sel.value === 'contracheques') hint.textContent = 'Modo: Contracheque';
+    else if (sel.value === 'comprovantes') hint.textContent = 'Modo: Comprovante (com editor de corte)';
+    else if (sel.value === 'folhas-ponto') hint.textContent = 'Modo: Folha de Ponto';
+}
+
+let _uploadAbortController = null;
+
+function limparUpload() {
+    const p = document.getElementById('upload-progresso');
+    const r = document.getElementById('upload-resultado');
+    const inp = document.getElementById('input-upload-inteligente');
+    if (p) p.style.display = 'none';
+    if (r) r.style.display = 'none';
+    if (inp) inp.value = '';
+}
+
 async function processarUploadInteligente(file) {
     if (!file) return;
     const progresso = document.getElementById('upload-progresso');
@@ -862,19 +953,59 @@ async function processarUploadInteligente(file) {
     if (statusStream) { statusStream.textContent = ''; statusStream.classList.remove('is-visible'); }
     progresso.style.display = 'block';
     resultado.style.display = 'none';
+    document.getElementById('btn-cancelar-upload').style.display = 'inline-block';
     statusMsg.textContent = 'Enviando e processando...';
+    _uploadAbortController = new AbortController();
     try {
         const session = await client.auth.getSession();
         const token = session.data.session?.access_token;
+        const tipoRadio = document.querySelector('input[name="tipo-upload"]:checked');
+        const tipoManual = tipoRadio && tipoRadio.value !== 'auto' ? tipoRadio.value : null;
         const formData = new FormData();
         formData.append('pdf', file);
+        if (tipoManual) formData.append('tipo_manual', tipoManual);
         const res = await fetch('/upload-inteligente', {
             method: 'POST',
             headers: { Authorization: `Bearer ${token}` },
-            body: formData
+            body: formData,
+            signal: _uploadAbortController.signal
         });
+        _uploadAbortController = null;
         const data = await res.json();
         progresso.style.display = 'none';
+
+        // Se precisar de corte visual
+        if (data.precisaCorte && data.sessionId) {
+            _sessionIdCorte = data.sessionId;
+            const modal = document.getElementById('modal-corte-comprovante');
+            modal.style.display = 'flex';
+            document.getElementById('corte-slider').value = 40;
+            document.getElementById('corte-linha').style.top = '40%';
+            document.getElementById('corte-porcentagem').textContent = '40%';
+            document.getElementById('msg-corte').textContent = 'Carregando preview...';
+            // Renderizar primeira página com pdf.js
+            const canvas = document.getElementById('corte-canvas');
+            const ctx = canvas.getContext('2d');
+            const pdfUrl = `/preview-corte/${data.sessionId}?_=${Date.now()}`;
+            pdfjsLib.getDocument(pdfUrl).promise.then(pdf => {
+                return pdf.getPage(1);
+            }).then(page => {
+                const viewport = page.getViewport({ scale: 1.1 });
+                canvas.width = viewport.width;
+                canvas.height = viewport.height;
+                const renderCtx = { canvasContext: ctx, viewport };
+                return page.render(renderCtx).promise;
+            }).then(() => {
+                const sv = document.getElementById('corte-slider').value;
+                atualizarLinhaCorte(sv);
+                document.getElementById('msg-corte').textContent = `Corte será aplicado a ${data.totalPaginas || 1} página(s)`;
+            }).catch(err => {
+                document.getElementById('msg-corte').textContent = 'Erro ao carregar preview';
+                console.error('pdf.js error:', err);
+            });
+            return;
+        }
+
         resultado.style.display = 'block';
         const listaRes = document.getElementById('upload-resultado-lista');
         if (res.ok) {
@@ -883,7 +1014,6 @@ async function processarUploadInteligente(file) {
                 <div class="resultado-info">
                     <strong>Upload concluído</strong>
                     <span>${data.pendentes || 0} pendente(s)</span>
-                    <small>Email: ${data.status_email || 'não enviado'}</small>
                 </div>
             </div>`;
         } else {
@@ -898,13 +1028,97 @@ async function processarUploadInteligente(file) {
         carregarEstatisticas();
         _pendentesCarregados = false;
     } catch(e) {
+        if (e.name === 'AbortError') return;
         progresso.style.display = 'none';
         resultado.style.display = 'block';
         document.getElementById('upload-resultado-lista').innerHTML = `<div class="resultado-item resultado-pendente">
             <div class="resultado-icon">⚠️</div>
             <div class="resultado-info"><strong>Erro de conexão</strong><span>${e.message}</span></div>
         </div>`;
+    } finally {
+        document.getElementById('btn-cancelar-upload').style.display = 'none';
     }
+}
+
+function cancelarUpload() {
+    if (_uploadAbortController) {
+        _uploadAbortController.abort();
+        _uploadAbortController = null;
+    }
+    const p = document.getElementById('upload-progresso');
+    if (p) p.style.display = 'none';
+    document.getElementById('btn-cancelar-upload').style.display = 'none';
+}
+
+let _corteAbortController = null;
+
+function fecharModalCorte() {
+    if (_corteAbortController) { _corteAbortController.abort(); _corteAbortController = null; }
+    document.getElementById('modal-corte-comprovante').style.display = 'none';
+    const canvas = document.getElementById('corte-canvas');
+    canvas.getContext('2d').clearRect(0, 0, canvas.width, canvas.height);
+    _sessionIdCorte = null;
+    document.getElementById('corte-loading').style.display = 'none';
+    document.getElementById('corte-buttons').style.display = 'flex';
+}
+
+async function confirmarCorteComprovante() {
+    if (!_sessionIdCorte) return;
+    const slider = document.getElementById('corte-slider');
+    const ySplit = Number(slider.value) / 100;
+    const msg = document.getElementById('msg-corte');
+    msg.textContent = '';
+    document.getElementById('corte-loading').style.display = 'flex';
+    document.getElementById('corte-buttons').style.display = 'none';
+    _corteAbortController = new AbortController();
+    try {
+        const session = await client.auth.getSession();
+        const token = session.data.session?.access_token;
+        const res = await fetch('/confirmar-corte', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${token}`
+            },
+            body: JSON.stringify({ sessionId: _sessionIdCorte, ySplit }),
+            signal: _corteAbortController.signal
+        });
+        _corteAbortController = null;
+        const data = await res.json();
+        fecharModalCorte();
+        const resultado = document.getElementById('upload-resultado');
+        resultado.style.display = 'block';
+        const listaRes = document.getElementById('upload-resultado-lista');
+        if (res.ok) {
+            listaRes.innerHTML = `<div class="resultado-item resultado-ok">
+                <div class="resultado-icon">✅</div>
+                <div class="resultado-info">
+                    <strong>Corte aplicado!</strong>
+                    <span>${data.pendentes || 0} pendente(s)</span>
+                </div>
+            </div>`;
+        } else {
+            listaRes.innerHTML = `<div class="resultado-item resultado-pendente">
+                <div class="resultado-icon">⚠️</div>
+                <div class="resultado-info">
+                    <strong>Erro</strong>
+                    <span>${data.erro || res.statusText}</span>
+                </div>
+            </div>`;
+        }
+        carregarEstatisticas();
+        _pendentesCarregados = false;
+    } catch(e) {
+        if (e.name === 'AbortError') return;
+        msg.textContent = `Erro: ${e.message}`;
+        document.getElementById('corte-loading').style.display = 'none';
+        document.getElementById('corte-buttons').style.display = 'flex';
+    }
+}
+
+function cancelarCorteComprovante() {
+    if (_corteAbortController) { _corteAbortController.abort(); _corteAbortController = null; }
+    fecharModalCorte();
 }
 
 // =============================================
@@ -1719,33 +1933,45 @@ window.alterarCadastroUsuario = function(userId, emailAtual, nomeAtual, fotoAtua
 };
 
 // =============================
-// NOTIFICAÇÕES
+// CORTE VISUAL DE COMPROVANTES
 // =============================
-function solicitarPermissaoNotificacao() {
-    if (!('Notification' in window)) return;
-    if (Notification.permission === 'default') {
-        Notification.requestPermission();
-    }
+
+function atualizarLinhaCorte(valor) {
+    const pct = Number(valor);
+    const canvas = document.getElementById('corte-canvas');
+    const ch = canvas.clientHeight || canvas.height || 1;
+    document.getElementById('corte-linha').style.top = (pct / 100 * ch) + 'px';
+    document.getElementById('corte-porcentagem').textContent = pct + '%';
 }
 
-function mostrarNotificacao(titulo, corpo) {
-    if (!('Notification' in window)) return;
-    if (Notification.permission === 'granted') {
-        new Notification(titulo, { body: corpo, icon: 'https://kidverte.vteximg.com.br/arquivos/kidvert-favicon.ico?v=636445463116770000' });
-    }
-}
+// Arrastar a linha de corte com o mouse
+document.addEventListener('DOMContentLoaded', function() {
+    const linha = document.getElementById('corte-linha');
+    const container = document.getElementById('corte-container');
+    let arrastando = false;
 
-// notificar quando badge aparecer
-const _badgeObserver = new MutationObserver(() => {
-    const badges = ['badge-pendentes', 'badge-atestados', 'badge-confirmacoes', 'badge-solicitacoes'];
-    const algumNovo = badges.some(id => {
-        const el = document.getElementById(id);
-        return el && el.style.display !== 'none' && Number(el.textContent) > 0;
+    linha.addEventListener('mousedown', function(e) {
+        arrastando = true;
+        e.preventDefault();
     });
-    if (algumNovo) {
-        mostrarNotificacao('Kidverte RH', 'Há algo de novo!');
-    }
+
+    document.addEventListener('mousemove', function(e) {
+        if (!arrastando) return;
+        const canvas = document.getElementById('corte-canvas');
+        const cr = canvas.getBoundingClientRect();
+        const y = e.clientY - cr.top;
+        const ch = canvas.clientHeight || canvas.height || 1;
+        const pct = Math.min(95, Math.max(5, (y / ch) * 100));
+        document.getElementById('corte-slider').value = Math.round(pct);
+        atualizarLinhaCorte(Math.round(pct));
+    });
+
+    document.addEventListener('mouseup', function() {
+        arrastando = false;
+    });
 });
+
+
 document.addEventListener('keydown', function(e) {
     if (e.key !== 'Escape') return;
     fecharVisualizarPdf();
@@ -1757,6 +1983,7 @@ document.addEventListener('keydown', function(e) {
     fecharModalSenha();
     fecharModalMeusDados();
     fecharModalEmpresa();
+    fecharModalCorte();
     if (document.getElementById('modal-corte-foto')?.style.display === 'flex') cancelarCorte();
 });
 </script>

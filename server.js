@@ -13,7 +13,16 @@ const { processarESalvarNaFila } = require('./ai/index');
 const { classificarDocumento } = require('./ai/DocumentClassifier');
 const { listarFila, resolverItem } = require('./ai/ReviewQueue');
 const { buscarDocumentos } = require('./scripts/emailFetcher');
+const crypto = require('crypto');
+const sharp = require('sharp');
 
+const sessoesCorte = new Map();
+setInterval(() => {
+    const now = Date.now();
+    for (const [id, s] of sessoesCorte) {
+        if (now - s.criadaEm > 30 * 60 * 1000) sessoesCorte.delete(id);
+    }
+}, 60 * 1000);
 
 const app = express();
 app.use(express.json());
@@ -99,7 +108,7 @@ app.get('/metricas', async (req, res) => {
         const acessos = acessosResp.data.filter(item => dentroDoPeriodo(item, inicio));
         const solicitacoes = solicitacoesResp.data.filter(item => dentroDoPeriodo(item, inicio));
         const atestados = atestadosResp.data.filter(item => dentroDoPeriodo(item, inicio));
-        const confirmacoes = confirmacoesResp.data.filter(item => dentroDoPeriodo(item, inicio));
+        const confirmacoes = confirmacoesResp.data.filter(item => !item.visualizada && dentroDoPeriodo(item, inicio));
         const pendentes = pendentesResp.data.filter(item => !item.vinculado_em);
 
         const porUsuario = new Map();
@@ -340,6 +349,22 @@ garantirBuckets().catch(err => console.warn("Aviso ao verificar buckets:", err.m
     }
 })();
 
+// Cria a coluna visualizada em confirmacoes_contracheque se não existir
+(async () => {
+    try {
+        await supabaseAdmin.from('confirmacoes_contracheque').select('visualizada').limit(1);
+    } catch {
+        console.log('Coluna visualizada ausente em confirmacoes_contracheque — criando via SQL direto...');
+        try {
+            await fetch('https://api.supabase.com/v1/projects/uatryxvylqwslnaxggjk/sql', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${SUPABASE_SERVICE_ROLE}` },
+                body: JSON.stringify({ query: 'ALTER TABLE public.confirmacoes_contracheque ADD COLUMN IF NOT EXISTS visualizada BOOLEAN DEFAULT FALSE;' })
+            });
+        } catch {}
+    }
+})();
+
 function lerTabela(nomeTabela) {
     return supabaseAdmin.from(nomeTabela).select('*').then(
         ({ data, error }) => error ? { data: [], aviso: error.message } : { data: data || [], aviso: null }
@@ -388,45 +413,36 @@ function dataRegistro(item = {}) {
 function normalizarYCorte(yCorte) {
     const valor = Number(yCorte);
     if (!Number.isFinite(valor)) return null;
-    if (valor < 0.2 || valor > 0.8) return null;
+    if (valor < 0.05 || valor > 0.95) return null;
     return valor;
 }
 
 async function extrairMetadePagina(pdfDoc, pageIndex, posicao, yCorte) {
-    if (posicao === 'unico') {
-        const doc = await PDFDocument.create();
-        const [pg] = await doc.copyPages(pdfDoc, [pageIndex]);
-        doc.addPage(pg);
-        return Buffer.from(await doc.save());
-    }
+    const destDoc = await PDFDocument.create();
+    const [page] = await destDoc.copyPages(pdfDoc, [pageIndex]);
+    destDoc.addPage(page);
 
-    const srcDoc = await PDFDocument.create();
-    const [srcPage] = await srcDoc.copyPages(pdfDoc, [pageIndex]);
-    srcDoc.addPage(srcPage);
-    const { width, height } = srcPage.getSize();
+    const { width, height } = page.getSize();
     const yFracao = normalizarYCorte(yCorte) ?? 0.5;
     const yPdf = height * (1 - yFracao);
-    const alturaDestino = posicao === 'topo' ? height - yPdf : yPdf;
 
-    const boundingBox = posicao === 'topo'
-        ? { left: 0, bottom: yPdf, right: width, top: height }
-        : { left: 0, bottom: 0, right: width, top: yPdf };
+    if (posicao === 'topo') {
+        page.setMediaBox(0, yPdf, width, height - yPdf);
+        page.setCropBox(0, yPdf, width, height - yPdf);
+    } else {
+        page.setMediaBox(0, 0, width, yPdf);
+        page.setCropBox(0, 0, width, yPdf);
+    }
 
-    const destDoc = await PDFDocument.create();
-    const destPage = destDoc.addPage([width, alturaDestino]);
-    const embedded = await destDoc.embedPage(srcPage, { boundingBox });
-    destPage.drawPage(embedded, { x: 0, y: 0, width, height: alturaDestino });
     return Buffer.from(await destDoc.save());
 }
 
-async function processarPaginaComprovante({ pagePdfBuffer, pageNumber }) {
+async function processarPaginaComprovante({ pagePdfBuffer, pageNumber, ySplit = 0.404 }) {
     let textoPagina = '';
     try {
         const dadosPagina = await pdfParse(pagePdfBuffer);
         textoPagina = dadosPagina.text || '';
     } catch { }
-
-    const ySplit = 0.404;
 
     const doc = await PDFDocument.load(pagePdfBuffer);
     const topo = await extrairMetadePagina(doc, 0, 'topo', ySplit);
@@ -461,12 +477,20 @@ async function processarPdfPorUsuario(req, res, bucket) {
             const [pagina] = await novoPdf.copyPages(pdfDoc, [i]);
             novoPdf.addPage(pagina);
             const pdfBytes = await novoPdf.save();
+            const pdfBuf = Buffer.from(pdfBytes);
 
-            // Comprovantes: verificar se página tem "corte aqui" e dividir
-            if (bucket === 'comprovantes') {
+            // Detecta se a página é comprovante pelo texto (funciona mesmo se bucket for outro)
+            let textoPagina = '';
+            let ehComprovante = bucket === 'comprovantes';
+            try {
+                const dadosPagina = await pdfParse(pdfBuf);
+                textoPagina = dadosPagina.text || '';
+                if (!ehComprovante) ehComprovante = /comprovante|pagamento/i.test(textoPagina);
+            } catch { }
+
+            if (ehComprovante) {
                 const divisao = await processarPaginaComprovante({
-                    pagePdfBuffer: Buffer.from(pdfBytes),
-                    pageNumber: i + 1
+                    pagePdfBuffer: pdfBuf, pageNumber: i + 1
                 });
 
                 const metades = divisao.dividir
@@ -487,25 +511,20 @@ async function processarPdfPorUsuario(req, res, bucket) {
                         if (error) console.log("ERRO STORAGE:", error.message);
                         else { console.log(`SALVO (pdf-parse): ${bucket}/${caminho}`); salvouAlgum = true; }
                     } else {
-                        // Tenta extrair nome por regex antes da IA
                         const nomeExtraidoTexto = metade.texto ? extrairNomeDoTexto(metade.texto) : null;
                         if (nomeExtraidoTexto) {
                             await salvarDocumentoPendente({
-                                buffer: metade.buffer,
-                                nomeArquivo: `pagina_${i + 1}${sufixo}.pdf`,
+                                buffer: metade.buffer, nomeArquivo: `pagina_${i + 1}${sufixo}.pdf`,
                                 nomeExtraido: nomeExtraidoTexto, cpfExtraido: null, tipo: bucket, mes, ano: new Date().getFullYear()
                             });
                             totalPendentes++;
                             continue;
                         }
                         let cpfExtraidoComprovante = null;
-                        // Fallback IA para comprovantes
                         try {
                             const resultado = await processarESalvarNaFila(gemini, supabaseAdmin, {
-                                fileBuffer: metade.buffer,
-                                mediaType: 'application/pdf',
-                                caminho: `${pastaUpload}/pagina_${i + 1}${sufixo}.pdf`,
-                                bucket
+                                fileBuffer: metade.buffer, mediaType: 'application/pdf',
+                                caminho: `${pastaUpload}/pagina_${i + 1}${sufixo}.pdf`, bucket
                             });
                             if (resultado.sucesso) {
                                 const dados = resultado.dados;
@@ -517,9 +536,7 @@ async function processarPdfPorUsuario(req, res, bucket) {
                                         const n = normalizarTexto(u.user_metadata?.full_name || '');
                                         return n && nomeNormalizado.includes(n);
                                     });
-                                    const nomeFinal = usuarioMatch
-                                        ? normalizarTexto(usuarioMatch.user_metadata?.full_name)
-                                        : nomeNormalizado;
+                                    const nomeFinal = usuarioMatch ? normalizarTexto(usuarioMatch.user_metadata?.full_name) : nomeNormalizado;
                                     const mesRef = dados.competencia || dados.periodo || mes ||
                                         new Date().toLocaleString('pt-BR', { month: 'long' }).toLowerCase();
                                     const nomeCompleto = `${nomeFinal} ${mesRef}${sufixo}.pdf`;
@@ -537,8 +554,7 @@ async function processarPdfPorUsuario(req, res, bucket) {
                             console.error(`Página ${i + 1}${sufixo} erro IA:`, aiErr.message);
                         }
                         await salvarDocumentoPendente({
-                            buffer: metade.buffer,
-                            nomeArquivo: `pagina_${i + 1}${sufixo}.pdf`,
+                            buffer: metade.buffer, nomeArquivo: `pagina_${i + 1}${sufixo}.pdf`,
                             nomeExtraido: null, cpfExtraido: cpfExtraidoComprovante, tipo: bucket, mes: null, ano: new Date().getFullYear()
                         });
                         totalPendentes++;
@@ -548,12 +564,6 @@ async function processarPdfPorUsuario(req, res, bucket) {
             }
 
             // === ETAPA 1: pdf-parse + regex (para contracheques/folhas-ponto) ===
-            let textoPagina = '';
-            try {
-                const dadosPagina = await pdfParse(Buffer.from(pdfBytes));
-                textoPagina = dadosPagina.text || '';
-            } catch { }
-
             const nome = textoPagina ? identificarUsuario(textoPagina, usuarios) : null;
             const mes = textoPagina ? extrairMes(textoPagina) : null;
 
@@ -567,7 +577,7 @@ async function processarPdfPorUsuario(req, res, bucket) {
                 continue;
             }
 
-            // === ETAPA 1.5: extrair nome por regex do texto (mesmo sem usuario cadastrado) ===
+            // === ETAPA 1.5: extrair nome por regex do texto ===
             const nomeExtraidoTexto = textoPagina ? extrairNomeDoTexto(textoPagina) : null;
             if (nomeExtraidoTexto) {
                 await salvarDocumentoPendente({
@@ -582,10 +592,8 @@ async function processarPdfPorUsuario(req, res, bucket) {
             console.log(`Página ${i + 1}: pdf-parse não identificou, acionando IA...`);
             try {
                 const resultado = await processarESalvarNaFila(gemini, supabaseAdmin, {
-                    fileBuffer: pdfBytes,
-                    mediaType: 'application/pdf',
-                    caminho: `${pastaUpload}/pagina_${i + 1}.pdf`,
-                    bucket
+                    fileBuffer: pdfBytes, mediaType: 'application/pdf',
+                    caminho: `${pastaUpload}/pagina_${i + 1}.pdf`, bucket
                 });
 
                 if (!resultado.sucesso) {
@@ -598,14 +606,26 @@ async function processarPdfPorUsuario(req, res, bucket) {
                     continue;
                 }
 
-                const dados = resultado.dados;
-                const nomeExtraido = dados.nome_funcionario || dados.funcionario || dados.nome || null;
-                const cpfExtraido = dados.cpf || null;
+                const dados = resultado.dados || {};
+                const confianca = resultado.confianca?.confianca_geral ?? 0;
 
-                if (!nomeExtraido) {
+                if (confianca < 60) {
+                    console.log(`Página ${i + 1} IA: confiança ${confianca} abaixo de 60, enviando para pendentes.`);
                     await salvarDocumentoPendente({
                         buffer: pdfBytes, nomeArquivo: `pagina_${i + 1}.pdf`,
-                        nomeExtraido: null, cpfExtraido, tipo: bucket, mes: null, ano: new Date().getFullYear()
+                        nomeExtraido: null, cpfExtraido: null, tipo: bucket, mes: null, ano: new Date().getFullYear()
+                    });
+                    totalPendentes++;
+                    continue;
+                }
+
+                const nomeExtraido = dados.nome_funcionario || dados.funcionario || dados.nome || null;
+                const cpfExtraidoIA = dados.cpf || null;
+                if (!nomeExtraido) {
+                    console.log(`Página ${i + 1} IA: nome não extraído, enviando para pendentes.`);
+                    await salvarDocumentoPendente({
+                        buffer: pdfBytes, nomeArquivo: `pagina_${i + 1}.pdf`,
+                        nomeExtraido: null, cpfExtraido: cpfExtraidoIA, tipo: bucket, mes: null, ano: new Date().getFullYear()
                     });
                     totalPendentes++;
                     continue;
@@ -613,36 +633,30 @@ async function processarPdfPorUsuario(req, res, bucket) {
 
                 const nomeNormalizado = normalizarTexto(nomeExtraido);
                 const usuarioMatch = usuarios.find(u => {
-                    const nome = normalizarTexto(u.user_metadata?.full_name || '');
-                    return nome && nomeNormalizado.includes(nome);
+                    const n = normalizarTexto(u.user_metadata?.full_name || '');
+                    return n && nomeNormalizado.includes(n);
                 });
-
-                const nomeFinal = usuarioMatch
-                    ? normalizarTexto(usuarioMatch.user_metadata?.full_name)
-                    : nomeNormalizado;
-
-                const mesRef = dados.competencia || dados.periodo || mes ||
+                const nomeFinal = usuarioMatch ? normalizarTexto(usuarioMatch.user_metadata?.full_name) : nomeNormalizado;
+                const mesRef = dados.competencia || dados.periodo ||
                     new Date().toLocaleString('pt-BR', { month: 'long' }).toLowerCase();
-
                 const nomeCompleto = `${nomeFinal} ${mesRef}.pdf`;
                 const caminhoIA = `${pastaUpload}/${nomeCompleto}`;
-
-                const { error } = await supabaseAdmin.storage
+                const { error: upErr } = await supabaseAdmin.storage
                     .from(bucket).upload(caminhoIA, pdfBytes, { contentType: 'application/pdf', upsert: true });
-
-                if (error) console.log("ERRO STORAGE IA:", error.message);
-                else {
-                    console.log(`SALVO (IA): ${bucket}/${caminhoIA} | Confiança: ${resultado.confianca?.confianca_geral}%`);
+                if (!upErr) {
+                    console.log(`SALVO (IA): ${bucket}/${caminhoIA} | Confiança: ${confianca}%`);
                     salvouAlgum = true;
+                    continue;
                 }
             } catch (aiErr) {
                 console.error(`Página ${i + 1} erro IA:`, aiErr.message);
-                await salvarDocumentoPendente({
-                    buffer: pdfBytes, nomeArquivo: `pagina_${i + 1}.pdf`,
-                    nomeExtraido: null, cpfExtraido: null, tipo: bucket, mes: null, ano: new Date().getFullYear()
-                });
-                totalPendentes++;
             }
+
+            await salvarDocumentoPendente({
+                buffer: pdfBytes, nomeArquivo: `pagina_${i + 1}.pdf`,
+                nomeExtraido: null, cpfExtraido: null, tipo: bucket, mes: null, ano: new Date().getFullYear()
+            });
+            totalPendentes++;
         }
 
         if (!salvouAlgum && totalPendentes > 0) {
@@ -656,44 +670,7 @@ async function processarPdfPorUsuario(req, res, bucket) {
 
         if (!salvouAlgum) return res.status(400).json({ erro: "Nenhum arquivo foi salvo." });
 
-        let statusEmail = 'smtp_nao_configurado';
-
-        if (smtpConfigurado()) {
-            try {
-                const { data: pastasCheck } = await supabaseAdmin.storage
-                    .from(bucket).list(pastaUpload, { limit: 1000 });
-
-                const anexos = [];
-                for (const arq of pastasCheck || []) {
-                    const { data: fileData } = await supabaseAdmin.storage
-                        .from(bucket).download(`${pastaUpload}/${arq.name}`);
-                    if (fileData) {
-                        const arrayBuffer = await fileData.arrayBuffer();
-                        anexos.push({ filename: arq.name, content: Buffer.from(arrayBuffer) });
-                    }
-                }
-
-                const totalAnexos = anexos.length;
-                const nomesBuckets = { 'contracheques': 'Contracheques', 'folhas-ponto': 'Folhas de Ponto', 'comprovantes': 'Comprovantes' };
-                const tipoBucket = nomesBuckets[bucket] || bucket;
-
-                await enviarEmail({
-                    from: 'Portal Kidverte <nao-responda@kidverte.com.br>',
-                    to: process.env.EMAIL_DESTINO_CONTRACHEQUES || 'financeiro@kidverte.com.br',
-                    subject: `[Kidverte] ${tipoBucket} carregados — ${totalAnexos} arquivo(s)`,
-                    html: `<h3>${tipoBucket} carregados com sucesso</h3><p><strong>Total:</strong> ${totalAnexos}</p><p><strong>Pasta:</strong> ${pastaUpload}</p>`,
-                    attachments: anexos
-                });
-
-                console.log(`EMAIL ENVIADO — ${totalAnexos} anexo(s)`);
-                statusEmail = 'enviado';
-            } catch (emailErr) {
-                console.error("SMTP ERROR:", emailErr.message);
-                statusEmail = 'erro_envio';
-            }
-        }
-
-        res.json({ sucesso: true, status_email: statusEmail, pendentes: totalPendentes });
+        res.json({ sucesso: true, status_email: 'nao_enviado', pendentes: totalPendentes });
 
     } catch (err) {
         console.error("ERRO:", err);
@@ -795,7 +772,26 @@ app.post('/upload-inteligente', upload.single('pdf'), async (req, res) => {
         if (!admin) return;
         if (!req.file) return res.status(400).json({ erro: 'Arquivo não enviado' });
         const pdfBuffer = req.file.buffer;
-        let bucket = await detectarTipoDocumento(pdfBuffer);
+
+        // Tipo manual pelo usuário
+        const tipoManual = req.body.tipo_manual;
+        if (tipoManual === 'comprovantes') {
+            const sessionId = crypto.randomUUID();
+            sessoesCorte.set(sessionId, {
+                pdfBuffer, bucket: 'comprovantes',
+                nomeArquivo: req.file.originalname,
+                totalPaginas: (await PDFDocument.load(pdfBuffer)).getPageCount(),
+                criadaEm: Date.now()
+            });
+            return res.json({ precisaCorte: true, sessionId, totalPaginas: sessoesCorte.get(sessionId).totalPaginas });
+        }
+
+        let bucket = null;
+        if (tipoManual) {
+            bucket = tipoManual;
+        } else {
+            bucket = await detectarTipoDocumento(pdfBuffer);
+        }
         if (!bucket) {
             try {
                 const base64 = pdfBuffer.toString('base64');
@@ -804,12 +800,181 @@ app.post('/upload-inteligente', upload.single('pdf'), async (req, res) => {
                     : tipo === 'folha-ponto' ? 'folhas-ponto'
                     : tipo === 'comprovante' ? 'comprovantes'
                     : null;
-            } catch { }
+                console.log(`Classificação IA: ${tipo || 'indefinido'} → bucket: ${bucket}`);
+            } catch (e) {
+                console.log("Classificação IA falhou:", e.message);
+            }
         }
         if (!bucket) bucket = 'contracheques';
+        console.log(`Bucket final: ${bucket}`);
+
+        // Detecta se precisa de corte visual (comprovante)
+        let precisaCorte = bucket === 'comprovantes';
+        if (!precisaCorte) {
+            try {
+                const dados = await pdfParse(pdfBuffer);
+                if (/comprovante|pagamento/i.test(dados.text || '')) {
+                    precisaCorte = true;
+                    bucket = 'comprovantes';
+                    console.log(`Corte ativado por texto: comprovante/pagamento encontrado → bucket alterado para comprovantes`);
+                }
+            } catch {}
+        }
+
+        if (precisaCorte) {
+            const sessionId = crypto.randomUUID();
+            sessoesCorte.set(sessionId, {
+                pdfBuffer, bucket,
+                nomeArquivo: req.file.originalname,
+                totalPaginas: (await PDFDocument.load(pdfBuffer)).getPageCount(),
+                criadaEm: Date.now()
+            });
+            return res.json({ precisaCorte: true, sessionId, totalPaginas: sessoesCorte.get(sessionId).totalPaginas });
+        }
+
         req.file.bucket = bucket;
         await processarPdfPorUsuario(req, res, bucket);
     } catch (err) {
+        res.status(500).json({ erro: err.message });
+    }
+});
+
+// =============================
+// PREVIEW & CONFIRMAR CORTE (comprovantes)
+// =============================
+
+app.get('/preview-corte/:sessionId', async (req, res) => {
+    const sessao = sessoesCorte.get(req.params.sessionId);
+    if (!sessao) return res.status(404).json({ erro: 'Sessão expirada' });
+    try {
+        const pdfDoc = await PDFDocument.load(sessao.pdfBuffer);
+        const firstPagePdf = await PDFDocument.create();
+        const [page] = await firstPagePdf.copyPages(pdfDoc, [0]);
+        firstPagePdf.addPage(page);
+        const pageBytes = await firstPagePdf.save();
+        res.type('application/pdf').send(Buffer.from(pageBytes));
+    } catch (err) {
+        res.status(500).json({ erro: err.message });
+    }
+});
+
+app.post('/confirmar-corte', async (req, res) => {
+    try {
+        const admin = await validarAdmin(req, res);
+        if (!admin) return;
+        const { sessionId, ySplit } = req.body;
+        if (!sessionId) return res.status(400).json({ erro: 'sessionId obrigatório' });
+        const sessao = sessoesCorte.get(sessionId);
+        if (!sessao) return res.status(400).json({ erro: 'Sessão expirada' });
+        sessoesCorte.delete(sessionId);
+
+        const pastaUpload = gerarTimestamp();
+        const { data: usersData } = await supabaseAdmin.auth.admin.listUsers();
+        const usuarios = usersData.users || [];
+
+        const pdfDoc = await PDFDocument.load(sessao.pdfBuffer);
+        const totalPaginas = pdfDoc.getPageCount();
+        let salvouAlgum = false;
+        let totalPendentes = 0;
+        const pos = typeof ySplit === 'number' ? ySplit : 0.404;
+
+        for (let i = 0; i < totalPaginas; i++) {
+            const novoPdf = await PDFDocument.create();
+            const [pagina] = await novoPdf.copyPages(pdfDoc, [i]);
+            novoPdf.addPage(pagina);
+            const pdfBytes = await novoPdf.save();
+            const pdfBuf = Buffer.from(pdfBytes);
+
+            let textoPagina = '';
+            try {
+                const dadosPagina = await pdfParse(pdfBuf);
+                textoPagina = dadosPagina.text || '';
+            } catch {}
+
+            const divisao = await processarPaginaComprovante({
+                pagePdfBuffer: pdfBuf, pageNumber: i + 1, ySplit: pos
+            });
+
+            const metades = [
+                { buffer: divisao.topo, sufixo: '_topo', texto: divisao.textoPagina },
+                { buffer: divisao.baixo, sufixo: '_baixo', texto: divisao.textoPagina }
+            ];
+
+            for (const metade of metades) {
+                const nome = metade.texto ? identificarUsuario(metade.texto, usuarios) : null;
+                const mes = metade.texto ? extrairMes(metade.texto) : null;
+                const sufixo = metade.sufixo || '';
+
+                if (nome) {
+                    const nomeArquivo = `${nome} ${mes || 'sem-mes'}${sufixo}.pdf`;
+                    const caminho = `${pastaUpload}/${nomeArquivo}`;
+                    const { error } = await supabaseAdmin.storage
+                        .from(sessao.bucket).upload(caminho, metade.buffer, { contentType: 'application/pdf', upsert: true });
+                    if (error) console.log("ERRO STORAGE:", error.message);
+                    else { console.log(`SALVO (pdf-parse): ${sessao.bucket}/${caminho}`); salvouAlgum = true; }
+                } else {
+                    const nomeExtraidoTexto = metade.texto ? extrairNomeDoTexto(metade.texto) : null;
+                    if (nomeExtraidoTexto) {
+                        await salvarDocumentoPendente({
+                            buffer: metade.buffer, nomeArquivo: `pagina_${i + 1}${sufixo}.pdf`,
+                            nomeExtraido: nomeExtraidoTexto, cpfExtraido: null, tipo: sessao.bucket, mes, ano: new Date().getFullYear()
+                        });
+                        totalPendentes++;
+                        continue;
+                    }
+                    let cpfExtraidoComprovante = null;
+                    try {
+                        const resultado = await processarESalvarNaFila(gemini, supabaseAdmin, {
+                            fileBuffer: metade.buffer, mediaType: 'application/pdf',
+                            caminho: `${pastaUpload}/pagina_${i + 1}${sufixo}.pdf`, bucket: sessao.bucket
+                        });
+                        if (resultado.sucesso) {
+                            const dados = resultado.dados;
+                            const nomeExtraido = dados.nome_funcionario || dados.funcionario || dados.nome || null;
+                            cpfExtraidoComprovante = dados.cpf || null;
+                            if (nomeExtraido) {
+                                const nomeNormalizado = normalizarTexto(nomeExtraido);
+                                const usuarioMatch = usuarios.find(u => {
+                                    const n = normalizarTexto(u.user_metadata?.full_name || '');
+                                    return n && nomeNormalizado.includes(n);
+                                });
+                                const nomeFinal = usuarioMatch ? normalizarTexto(usuarioMatch.user_metadata?.full_name) : nomeNormalizado;
+                                const mesRef = dados.competencia || dados.periodo || mes ||
+                                    new Date().toLocaleString('pt-BR', { month: 'long' }).toLowerCase();
+                                const nomeCompleto = `${nomeFinal} ${mesRef}${sufixo}.pdf`;
+                                const caminhoIA = `${pastaUpload}/${nomeCompleto}`;
+                                const { error: upErr } = await supabaseAdmin.storage
+                                    .from(sessao.bucket).upload(caminhoIA, metade.buffer, { contentType: 'application/pdf', upsert: true });
+                                if (!upErr) {
+                                    console.log(`SALVO (IA): ${sessao.bucket}/${caminhoIA} | Confiança: ${resultado.confianca?.confianca_geral}%`);
+                                    salvouAlgum = true;
+                                    continue;
+                                }
+                            }
+                        }
+                    } catch (aiErr) {
+                        console.error(`Página ${i + 1}${sufixo} erro IA:`, aiErr.message);
+                    }
+                    await salvarDocumentoPendente({
+                        buffer: metade.buffer, nomeArquivo: `pagina_${i + 1}${sufixo}.pdf`,
+                        nomeExtraido: null, cpfExtraido: cpfExtraidoComprovante, tipo: sessao.bucket, mes: null, ano: new Date().getFullYear()
+                    });
+                    totalPendentes++;
+                }
+            }
+        }
+
+        if (!salvouAlgum && totalPendentes > 0) {
+            return res.json({
+                sucesso: true, status_email: 'nao_enviado',
+                pendentes: totalPendentes, aviso: 'Documentos enviados para pendentes.'
+            });
+        }
+        if (!salvouAlgum) return res.status(400).json({ erro: "Nenhum arquivo foi salvo." });
+
+        res.json({ sucesso: true, status_email: 'nao_enviado', pendentes: totalPendentes });
+    } catch (err) {
+        console.error("ERRO:", err);
         res.status(500).json({ erro: err.message });
     }
 });
@@ -861,19 +1026,64 @@ app.post('/verificar-email', async (req, res) => {
     }
 });
 
+app.post('/verificar-solicitacoes', async (req, res) => {
+    try {
+        const admin = await validarAdmin(req, res);
+        if (!admin) return;
+        await verificarSolicitacoesPendentes();
+        res.json({ sucesso: true });
+    } catch (err) {
+        res.status(500).json({ erro: err.message });
+    }
+});
+
 // Executa no startup se estiver entre dia 1-5
 const diaAtual = new Date().getDate();
+async function verificarSolicitacoesPendentes() {
+    try {
+        const seteDiasAtras = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+        const { data, error } = await supabaseAdmin
+            .from('solicitacoes_contracheques')
+            .select('id, criado_em')
+            .eq('status', 'pendente')
+            .lt('criado_em', seteDiasAtras);
+        if (error) { console.error('Erro ao verificar solicitações:', error.message); return; }
+        if (!data || data.length === 0) return;
+        const baseUrl = process.env.APP_URL || 'http://localhost:3000';
+        const link = baseUrl + '/admin.html?secao=solicitacoes';
+        await enviarEmail({
+            from: 'Portal Kidverte <nao-responda@kidverte.com.br>',
+            to: process.env.EMAIL_DESTINO_CONTRACHEQUES || 'financeiro@kidverte.com.br',
+            subject: 'Atenção — Solicitações pendentes',
+            html: `<h3>Atenção, ainda existem solicitações não resolvidas</h3>
+                   <p><strong>Total:</strong> ${data.length} solicitação(ões) pendente(s) há mais de 7 dias.</p>
+                   <p><a href="${link}" style="display:inline-block;padding:10px 20px;background:#007bff;color:#fff;text-decoration:none;border-radius:6px;">Resolver solicitações pendentes</a></p>
+                   <p style="font-size:12px;color:#6b7280;">Após o login, você será direcionado automaticamente para a página de solicitações.</p>`
+        });
+        console.log(`EMAIL SOLICITAÇÕES PENDENTES — ${data.length} solicitação(ões)`);
+    } catch (e) {
+        console.error('Erro verificarSolicitacoesPendentes:', e.message);
+    }
+}
+
 if (diaAtual >= 1 && diaAtual <= 5) {
     setTimeout(() => {
         processarDocumentosEmail().catch(e => console.error('Email fetcher startup:', e.message));
     }, 5000);
-    // Verifica a cada 6 horas durante dias 1-5
     setInterval(() => {
         if (new Date().getDate() >= 1 && new Date().getDate() <= 5) {
             processarDocumentosEmail().catch(e => console.error('Email fetcher interval:', e.message));
         }
     }, 6 * 60 * 60 * 1000);
 }
+
+// Verifica solicitações pendentes a cada 6 horas (todos os dias)
+setTimeout(() => {
+    verificarSolicitacoesPendentes().catch(e => console.error('Solic pendentes startup:', e.message));
+}, 10000);
+setInterval(() => {
+    verificarSolicitacoesPendentes().catch(e => console.error('Solic pendentes interval:', e.message));
+}, 6 * 60 * 60 * 1000);
 
 // =============================
 // ROTAS: PENDENTES
@@ -1191,7 +1401,12 @@ app.get('/solicitacoes-contracheques', async (req, res) => {
         const user = await validarUsuario(req, res);
         if (!user) return;
 
-        let query = supabaseAdmin.from('solicitacoes_contracheques').select('*').order('criado_em', { ascending: false });
+        const trintaDiasAtras = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+
+        let query = supabaseAdmin.from('solicitacoes_contracheques')
+            .select('*')
+            .or(`status.eq.pendente,data_resposta.gte.${trintaDiasAtras}`)
+            .order('criado_em', { ascending: false });
         if (user.user_metadata?.tipo !== 'admin') query = query.eq('user_id', user.id);
 
         const { data, error } = await query;
@@ -1365,11 +1580,28 @@ app.post('/confirmacoes', async (req, res) => {
         const { error: erroInsert } = await supabaseAdmin.from('confirmacoes_contracheque').insert({
             user_id: user.id,
             nome_usuario: user.user_metadata?.full_name || "",
-            arquivo, confirmado: true
+            arquivo, confirmado: true, visualizada: false
         });
 
         if (erroInsert) return res.status(400).json({ erro: erroInsert.message });
         res.json({ sucesso: true, existente: false });
+    } catch (err) {
+        res.status(500).json({ erro: err.message });
+    }
+});
+
+app.post('/confirmacoes/marcar-vistas', async (req, res) => {
+    try {
+        const admin = await validarAdmin(req, res);
+        if (!admin) return;
+
+        const { error } = await supabaseAdmin
+            .from('confirmacoes_contracheque')
+            .update({ visualizada: true })
+            .eq('visualizada', false);
+
+        if (error) return res.status(400).json({ erro: error.message });
+        res.json({ sucesso: true });
     } catch (err) {
         res.status(500).json({ erro: err.message });
     }
